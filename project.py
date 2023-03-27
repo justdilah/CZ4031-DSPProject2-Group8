@@ -1,8 +1,6 @@
 import interface
 import explain
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget,QMainWindow
-
 import psycopg2
 
 class DatabaseCursor(object):
