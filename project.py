@@ -29,7 +29,7 @@ def main():
     form = QtWidgets.QWidget()
     ui = interface.Ui_Form()
     ui.setupUi(form)
-    explain.onDatabaseChanged(ui)
+    explainObject = explain.Explain(ui)
     form.show()
     app.exec()
 

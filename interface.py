@@ -24,55 +24,43 @@ class Ui_Form(object):
         self.mainHorizontalLayout.setObjectName("mainHorizontalLayout")
         self.LeftLayout = QtWidgets.QVBoxLayout()
         self.LeftLayout.setObjectName("LeftLayout")
+
+        # -------------------------- DATABASE SCHEMA -----------------------------------------
+        # Label
         self.schemaLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.schemaLabel.setObjectName("schemaLabel")
         self.LeftLayout.addWidget(self.schemaLabel)
 
-
-
-        # self.databaseSchema = QtWidgets.QTreeWidget(self.horizontalLayoutWidget_2)
-        # self.databaseSchema.setObjectName("databaseSchema")
-        # databaseSchemaitem = QTreeWidgetItem()
-        # databaseSchemaitem.setText(0, u"1");
-        # self.tree_attrs.setHeaderItem(databaseSchemaitem)
-        # self.tree_attrs.setObjectName(u"tree_attrs")
-        # sizePolicy2 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
-        # sizePolicy2.setHorizontalStretch(0)
-        # sizePolicy2.setVerticalStretch(0)
-        # sizePolicy2.setHeightForWidth(self.tree_attrs.sizePolicy().hasHeightForWidth())
-        # self.tree_attrs.setSizePolicy(sizePolicy2)
-        # self.tree_attrs.setMinimumSize(QSize(500, 0))
-        # self.tree_attrs.setMaximumSize(QSize(16777215, 16777215))
-        # self.tree_attrs.setColumnCount(1)
-        # self.tree_attrs.header().setVisible(True)
-        #
-        # self.left.addWidget(self.tree_attrs)
-
+        # QTreeWidget
         self.databaseSchema = QTreeWidget(self.horizontalLayoutWidget_2)
         self.databaseSchema.setObjectName(u"databaseSchema")
         self.databaseSchema.setHeaderLabels(["Schema"])
 
         self.LeftLayout.addWidget(self.databaseSchema)
-
-
-
-
         self.LeftLayout.addWidget(self.databaseSchema)
         self.mainHorizontalLayout.addLayout(self.LeftLayout)
         self.RightLayout = QtWidgets.QVBoxLayout()
         self.RightLayout.setObjectName("RightLayout")
         self.TopLayout = QtWidgets.QHBoxLayout()
         self.TopLayout.setObjectName("TopLayout")
+
+        # -------------------------- OLD QUERY -----------------------------------------
         self.OldQueryLayout = QtWidgets.QVBoxLayout()
         self.OldQueryLayout.setObjectName("OldQueryLayout")
+
+        # Label
         self.oldQueryLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.oldQueryLabel.setObjectName("oldQueryLabel")
         self.OldQueryLayout.addWidget(self.oldQueryLabel)
+
+        # Old Query Input
         self.oldQueryInput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQueryInput.setObjectName("oldQueryInput")
         self.oldQueryInput.setReadOnly(False)
 
         self.OldQueryLayout.addWidget(self.oldQueryInput)
+
+        # Old Query Button
         self.oldQueryButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.oldQueryButton.setObjectName("oldQueryButton")
         self.OldQueryLayout.addWidget(self.oldQueryButton)
@@ -82,6 +70,8 @@ class Ui_Form(object):
         self.oldQEPLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.oldQEPLabel.setObjectName("oldQEPLabel")
         self.oldQEPLayout.addWidget(self.oldQEPLabel)
+
+        # Display Old QEP Plan
         self.oldQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQEPOutput.setObjectName("oldQEPOutput")
         self.oldQEPLayout.addWidget(self.oldQEPOutput)
@@ -91,6 +81,8 @@ class Ui_Form(object):
         self.oldVisualLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.oldVisualLabel.setObjectName("oldVisualLabel")
         self.oldVisualLayout.addWidget(self.oldVisualLabel)
+
+        # Display Old Visual Plan
         self.oldGraphicsView = QtWidgets.QGraphicsView(self.horizontalLayoutWidget_2)
         self.oldGraphicsView.setObjectName("oldGraphicsView")
         self.oldVisualLayout.addWidget(self.oldGraphicsView)
@@ -98,16 +90,23 @@ class Ui_Form(object):
         self.RightLayout.addLayout(self.TopLayout)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+
+        # -------------------------- NEW QUERY -----------------------------------------
         self.NewQueryLayout = QtWidgets.QVBoxLayout()
         self.NewQueryLayout.setObjectName("NewQueryLayout")
+
+        # Label
         self.newQueryLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.newQueryLabel.setObjectName("newQueryLabel")
         self.NewQueryLayout.addWidget(self.newQueryLabel)
+
+        # New Query Input
         self.newQueryInput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.newQueryInput.setObjectName("newQueryInput")
         self.newQueryInput.setReadOnly(False)
-
         self.NewQueryLayout.addWidget(self.newQueryInput)
+
+        # New Query Button
         self.newQueryButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.newQueryButton.setObjectName("newQueryButton")
         self.NewQueryLayout.addWidget(self.newQueryButton)
@@ -117,6 +116,8 @@ class Ui_Form(object):
         self.newQEPLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.newQEPLabel.setObjectName("newQEPLabel")
         self.newQEPLayout.addWidget(self.newQEPLabel)
+
+        # Display New QEP Plan
         self.newQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.newQEPOutput.setObjectName("newQEPOutput")
         self.newQEPLayout.addWidget(self.newQEPOutput)
@@ -126,6 +127,8 @@ class Ui_Form(object):
         self.newVisualLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
         self.newVisualLabel.setObjectName("newVisualLabel")
         self.newVisualLayout.addWidget(self.newVisualLabel)
+
+        # Display New Visual Plan
         self.newGraphicsView = QtWidgets.QGraphicsView(self.horizontalLayoutWidget_2)
         self.newGraphicsView.setObjectName("newGraphicsView")
         self.newVisualLayout.addWidget(self.newGraphicsView)
@@ -147,6 +150,11 @@ class Ui_Form(object):
 
         self.newQEPOutput.clear()
         self.oldQEPOutput.clear()
+
+    def getOldQueryInput(self):
+        return self.oldQueryInput.toPlainText()
+    def getNewQueryInput(self):
+        return self.newQueryInput.toPlainText()
 
     def setSchema(self, schema=None):
         self.databaseSchema.reset()
