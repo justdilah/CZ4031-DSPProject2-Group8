@@ -19,7 +19,6 @@ class DatabaseCursor(object):
             port=self.config["port"]
         )
         self.cur = self.conn.cursor()
-        print("Hello")
         return self.cur
 
     def __exit__(self, exc_type, exc_val, exc_tb):

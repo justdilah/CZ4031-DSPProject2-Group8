@@ -33,7 +33,10 @@ class Ui_Form(object):
         self.instructions = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.instructions.setObjectName("instructions")
         self.instructions.setReadOnly(True)
-        instructionsString = "1. Once the Query Q has been submitted,  'Submit Query' button will be DISABLED. Click on the Reset button to re-enable it.\n\n2. Query Q' and 'Submit Updated Query' button will only be enabled when Query Q has been submitted."
+        instructionsString = ("1. Once the Query Q has been submitted,  'Submit Query' button will be DISABLED. Click on the Reset button to re-enable it.\n\n2. Query Q' and 'Submit Updated Query' button will only be enabled when Query Q has been submitted.\n\n"
+        "3. Creative Functionality: Improved user experience with Text-To-Speech capabilities to read your QEP for you! Press the 'Play' button under any of the QEP textboxes"
+         "to play the audio that reads out the QEP to you, and press the 'Stop' button to stop the audio at any time.")
+
         self.instructions.setText(instructionsString)
 
         self.instructionsLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
@@ -67,14 +70,11 @@ class Ui_Form(object):
         self.oldQueryInput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQueryInput.setObjectName("oldQueryInput")
         self.oldQueryInput.setReadOnly(False)
-        # self.oldQueryInput.setStyleSheet("background-color: white;")
-
         self.OldQueryLayout.addWidget(self.oldQueryInput)
 
         # Old Query Button
         self.oldQueryButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.oldQueryButton.setObjectName("oldQueryButton")
-        # self.oldQueryButton.setStyleSheet("background-color: white;")
 
         self.OldQueryLayout.addWidget(self.oldQueryButton)
         self.TopLayout.addLayout(self.OldQueryLayout)
@@ -88,8 +88,32 @@ class Ui_Form(object):
         # Display Old QEP Plan
         self.oldQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQEPOutput.setObjectName("oldQEPOutput")
-        # self.oldQEPOutput.setStyleSheet("background-color: white;")
+
+        self.oldAudiohorizontalLayout = QtWidgets.QHBoxLayout()
+        # self.horizontalLayout = QHBoxLayout()
+        self.oldAudiohorizontalLayout.setObjectName(u"horizontalLayout")
+
+        # Play button
+        self.playOldButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.playOldButton.setObjectName("playOldButton")
+        self.playOldButton.setText("Play \U0001F50A")
+        self.playOldButton.setEnabled(False)
+        self.oldAudiohorizontalLayout.addWidget(self.playOldButton)
+
+
+        # Stop button
+        self.stopOldButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.stopOldButton.setObjectName("stopOldButton")
+        self.stopOldButton.setText("Stop \U0001F507")
+        self.stopOldButton.setEnabled(False)
+        self.oldAudiohorizontalLayout.addWidget(self.stopOldButton)
+        # self.horizontalLayoutWidget_2.addWidget(self.horizontalLayout)
+
         self.oldQEPLayout.addWidget(self.oldQEPOutput)
+        self.oldQEPLayout.addLayout(self.oldAudiohorizontalLayout)
+        # self.oldQEPLayout.addWidget(self.playOldButton)
+        # self.oldQEPLayout.addWidget(self.stopOldButton)
+
         self.TopLayout.addLayout(self.oldQEPLayout)
         self.oldVisualLayout = QtWidgets.QVBoxLayout()
         self.oldVisualLayout.setObjectName("oldVisualLayout")
@@ -141,7 +165,26 @@ class Ui_Form(object):
         self.newQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.newQEPOutput.setObjectName("newQEPOutput")
 
+        self.newAudiohorizontalLayout = QtWidgets.QHBoxLayout()
+        # self.horizontalLayout = QHBoxLayout()
+        self.newAudiohorizontalLayout.setObjectName(u"newhorizontalLayout")
+
+        # Play button
+        self.playNewButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.playNewButton.setObjectName("playOldButton")
+        self.playNewButton.setText("Play \U0001F50A")
+        self.playNewButton.setEnabled(False)
+        self.newAudiohorizontalLayout.addWidget(self.playNewButton)
+
+        # Stop button
+        self.stopNewButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.stopNewButton.setObjectName("stopOldButton")
+        self.stopNewButton.setText("Stop \U0001F507")
+        self.stopNewButton.setEnabled(False)
+        self.newAudiohorizontalLayout.addWidget(self.stopNewButton)
+
         self.newQEPLayout.addWidget(self.newQEPOutput)
+        self.newQEPLayout.addLayout(self.newAudiohorizontalLayout)
         self.horizontalLayout_2.addLayout(self.newQEPLayout)
         self.newVisualLayout = QtWidgets.QVBoxLayout()
         self.newVisualLayout.setObjectName("newVisualLayout")

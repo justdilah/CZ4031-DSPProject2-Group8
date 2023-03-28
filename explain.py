@@ -1,11 +1,16 @@
 from project import DatabaseCursor
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QUrl
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+import time
 from PyQt5.QtWidgets import *
 import sys
 import json
 
-FILE_CONFIG = "config.json"
 
+from gtts import gTTS
+import os
+
+FILE_CONFIG = "config.json"
 
 class Explain:
     def __init__(self, ui):
@@ -28,6 +33,16 @@ class Explain:
         # Reset Button
         self.onClickedResetButton()
 
+        # Text-to-speech capabilities
+        self.player = QMediaPlayer()
+
+        self.onClickedOldPlayButton()
+        self.onClickedOldStopButton()
+
+        self.onClickedNewPlayButton()
+        self.onClickedNewStopButton()
+
+
     def onDatabaseChanged(self):
         self.updateSchema()
 
@@ -47,6 +62,12 @@ class Explain:
         self.interface.resetButton.clicked.connect(lambda: self.interface.newQueryButton.setEnabled(False))
         self.interface.resetButton.clicked.connect(lambda: self.interface.newQueryInput.setReadOnly(True))
 
+        self.interface.resetButton.clicked.connect(lambda: self.interface.playOldButton.setEnabled(False))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.stopOldButton.setEnabled(False))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.playNewButton.setEnabled(False))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.stopNewButton.setEnabled(False))
+
+
     def disabledStateForOldQuery(self):
         self.interface.oldQueryButton.setEnabled(False)
         self.interface.oldQueryInput.setReadOnly(True)
@@ -54,7 +75,12 @@ class Explain:
     def analyseOldQuery(self):
         query = self.interface.getOldQueryInput()
         if query.strip() != "":
+
+            self.textToSpeech(query.strip(), "oldQuery")
             self.interface.showOldQEP(query.strip())
+
+            self.interface.stopOldButton.setEnabled(True)
+            self.interface.playOldButton.setEnabled(True)
             self.disabledStateForOldQuery()
             self.interface.newQueryButton.setEnabled(True)
             self.interface.newQueryInput.setReadOnly(False)
@@ -64,7 +90,11 @@ class Explain:
     def analyseNewQuery(self):
         query = self.interface.getNewQueryInput()
         if query.strip() != "":
+            self.textToSpeech(query.strip(),"newQuery")
             self.interface.showNewQEP(query.strip())
+
+            self.interface.stopNewButton.setEnabled(True)
+            self.interface.playNewButton.setEnabled(True)
         else:
             self.interface.showError("Please input Query Q'")
 
@@ -101,3 +131,47 @@ class Explain:
         except Exception as e:
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
+
+    #----------------------------------- Text-to-Speech -----------------------------------------------------
+    def onClickedOldPlayButton(self):
+        self.interface.playOldButton.clicked.connect(lambda: self.playAudioFile("oldQuery"))
+
+    def onClickedOldStopButton(self):
+        self.interface.stopOldButton.clicked.connect(self.stopAudioFile)
+
+    def onClickedNewPlayButton(self):
+        self.interface.playNewButton.clicked.connect(lambda: self.playAudioFile("newQuery"))
+
+    def onClickedNewStopButton(self):
+        self.interface.stopNewButton.clicked.connect(self.stopAudioFile)
+    def textToSpeech(self,text, typeOfQuery):
+
+        speaker = gTTS(text=text, lang="en", slow=False)
+
+        file_path = os.path.join(os.getcwd(), typeOfQuery + str(".mp3"))
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # saves the text speech as an MP3
+        speaker.save(typeOfQuery + str(".mp3"))
+
+        # returns stat_result object
+        statbuf = os.stat(typeOfQuery + str(".mp3"))
+
+        # statbuf.st_size -> represents the size of the file in kbytes -> convert to MBytes
+        mbytes = statbuf.st_size / 1024
+
+        # MB / 200 MBPS -> to get the duration of the mp3 in seconds
+        duration = mbytes / 200
+
+    def stopAudioFile(self):
+        self.player.pause()
+    def playAudioFile(self,typeOfQuery):
+        mp3_name = typeOfQuery + str(".mp3")
+        file_path = os.path.join(os.getcwd(), mp3_name)
+        url = QUrl.fromLocalFile(file_path)
+
+        content = QMediaContent(url)
+        self.player.setMedia(QMediaContent())  # reset the media player
+        self.player.setMedia(content)
+        self.player.play()
