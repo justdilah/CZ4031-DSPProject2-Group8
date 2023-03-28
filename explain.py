@@ -21,6 +21,13 @@ class Explain:
         # Retrieve and display database schema
         self.onDatabaseChanged()
 
+        # On CLicked Methods for Submit Buttons
+        self.onClickedOldQueryButton()
+        self.onClickedNewQueryButton()
+
+        # Reset Button
+        self.onClickedResetButton()
+
     def onDatabaseChanged(self):
         self.updateSchema()
 
@@ -30,6 +37,39 @@ class Explain:
 
         return True
 
+    def onClickedOldQueryButton(self):
+        self.interface.oldQueryButton.clicked.connect(self.analyseOldQuery)
+    def onClickedNewQueryButton(self):
+        self.interface.newQueryButton.clicked.connect(self.analyseNewQuery)
+    def onClickedResetButton(self):
+        self.interface.resetButton.clicked.connect(lambda: self.interface.oldQueryButton.setEnabled(True))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.oldQueryInput.setReadOnly(False))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.newQueryButton.setEnabled(False))
+        self.interface.resetButton.clicked.connect(lambda: self.interface.newQueryInput.setReadOnly(True))
+
+    def disabledStateForOldQuery(self):
+        self.interface.oldQueryButton.setEnabled(False)
+        self.interface.oldQueryInput.setReadOnly(True)
+
+    def analyseOldQuery(self):
+        query = self.interface.getOldQueryInput()
+        if query.strip() != "":
+            self.interface.showOldQEP(query.strip())
+            self.disabledStateForOldQuery()
+            self.interface.newQueryButton.setEnabled(True)
+            self.interface.newQueryInput.setReadOnly(False)
+        else:
+            self.interface.showError("Please input Query Q")
+
+    def analyseNewQuery(self):
+        query = self.interface.getNewQueryInput()
+        if query.strip() != "":
+            self.interface.showNewQEP(query.strip())
+        else:
+            self.interface.showError("Please input Query Q'")
+
+
+
     def updateSchema(self):
         if not self.checkConfigFileExists():
             self.interface.setSchema(None)
@@ -37,7 +77,6 @@ class Explain:
             return
 
         try:
-
             with DatabaseCursor(self.config) as cursor:
 
                 query = "SELECT table_name, column_name, data_type, character_maximum_length as length FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position"

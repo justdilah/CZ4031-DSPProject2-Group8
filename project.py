@@ -1,7 +1,8 @@
 import interface
 import explain
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget,QMainWindow
+from qt_material import apply_stylesheet
+
 
 import psycopg2
 
@@ -24,12 +25,19 @@ class DatabaseCursor(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.close()
 
+
 def main():
     app = QtWidgets.QApplication([])
+    app.setStyle('Windows')
+
+    apply_stylesheet(app, theme='dark_amber.xml')
+
     form = QtWidgets.QWidget()
     ui = interface.Ui_Form()
     ui.setupUi(form)
+
     explainObject = explain.Explain(ui)
+
     form.show()
     app.exec()
 
