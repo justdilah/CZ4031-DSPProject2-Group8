@@ -9,3 +9,4 @@ Project 2 Implementation for CZ4031 DATABASE SYSTEM PRINCIPLES
 - pip install pyqt5-tools
 - pip install psycopg2
 - pip install qt-material
+- pip install gTTS
