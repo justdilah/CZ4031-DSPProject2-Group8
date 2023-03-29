@@ -1,64 +1,153 @@
-from project import DatabaseCursor
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import *
-import sys
+import psycopg2
 import json
+import re
 
-FILE_CONFIG = "config.json"
-
-
-class Explain:
-    def __init__(self, ui):
-        # Define configuration file
-        with open(FILE_CONFIG, "r") as file:
-            config = json.load(file)
-            print(config)
-            self.config = config["TPC-H"]
-
-        # Initialise UI
-        self.interface = ui
-
-        # Retrieve and display database schema
-        self.onDatabaseChanged()
-
-    def onDatabaseChanged(self):
-        self.updateSchema()
-
-    def checkConfigFileExists(self):
-        if not hasattr(self, "config") or self.config == None:
-            return False
-
-        return True
-
-    def updateSchema(self):
-        if not self.checkConfigFileExists():
-            self.interface.setSchema(None)
-            print("Configuration file does not exists")
-            return
+class CursorManager(object):
+    def __init__(self):
+        self._CONFIG_PATH = "./config.json"
 
         try:
+            with open(self._CONFIG_PATH, "r") as f:
+                config = json.load(f)
+        except FileNotFoundError as e:
+            raise e
 
-            with DatabaseCursor(self.config) as cursor:
+        self._config = config["TPC-H"]
+        self.conn = None
+        self.cursor = None
 
-                query = "SELECT table_name, column_name, data_type, character_maximum_length as length FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position"
-                cursor.execute(query)
-                response = cursor.fetchall()
+        self.__connect__()
 
-                # Parse response stored in dictionary
-                schema = {}
-                for item in response:
-                    # Columns are table name, column name, data type, length
-                    attrs = schema.get(item[0], [])
-                    attrs.append(item[1])
-                    schema[item[0]] = attrs
+    def __connect__(self):
+        try:
+            self.conn = psycopg2.connect(
+                host=self._config["host"],
+                dbname=self._config["dbname"],
+                user=self._config["user"],
+                password=self._config["pwd"],
+                port=self._config["port"]
+            )
+            self.cursor = self.conn.cursor()
 
-                # To log our database
-                print("Database schema as follow: ")
-                for t, table in enumerate(schema):
-                    print(t + 1, table, schema.get(table))
+        except Exception as e:
+            print(f'Connection attempt failed with error: {e}')
 
-                self.interface.setSchema(schema)
+    def get_cursor(self):
+        return self.cursor
 
+    def close(self, exc_type, exc_val, exc_tb):
+        try:
+            self.conn.close()
+        except Exception as e:
+            print(f'Cursor failed to close with error: {e}')
+
+    def get_QEP(self, cursor, query: str):
+        try:
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f'Cursor failed to execute query with error: {e}')
+            return []
+
+class QEP_Node():
+    def __init__(self, indent_size: int, operation: str, details: str):
+        self.indent_size = indent_size
+        self.operation = operation
+        self.details = details
+        self.parent = None
+        self.children = []
+
+class QEP_Tree():
+    def __init__(self):
+        self.root = None
+        self.prev_indent_size = 0
+
+    # builds the QEP tree and returns the root node
+    def build(self, plan):
+        cur_node = None
+        for row in plan:
+            cur_row = row[0]
+            if "->" in cur_row:
+                match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
+                indent_size = len(match.group(1))
+                operation = match.group(2).replace("Parallel", "")
+                details = match.group(3)
+                
+                node = QEP_Node(indent_size, operation, details)
+
+                if self.root == None:
+                    self.root = node
+                    self.root.parent = self.root
+                    cur_node = self.root
+                    self.prev_indent_size = indent_size
+                    continue
+        
+                # node is on the same level
+                if self.prev_indent_size == indent_size:
+                    parent = cur_node.parent
+                    node.parent = parent
+                    parent.children.append(node)
+                else:
+                    node.parent = cur_node
+                    cur_node.children.append(node)
+
+                self.prev_indent_size = indent_size
+                cur_node = node
+
+        return self.root
+    
+    # for now prints the tree
+    # later will need to adapt this to create the visuals
+    def print_tree(self, node: QEP_Node, depth: int):
+        print(self.traverse(node, depth))
+
+    # traverse the tree recursively
+    def traverse(self, node: QEP_Node, depth: int):
+        if node == None:
+            return ""
+        
+        result = " " * depth + node.operation + "\n"
+
+        for child in node.children:
+            result += self.traverse(child, depth+1)
+        
+        return result
+
+class Explain():
+    def __init__(self, interface, cursorManager: CursorManager):
+        self.interface = interface
+        self.cursorManager = cursorManager
+        self.cursor = self.cursorManager.get_cursor()
+        self.updateSchema()
+
+    def updateSchema(self):
+        try:
+            query = "SELECT table_name, column_name, data_type, character_maximum_length as length FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position"
+            self.cursor.execute(query)
+            response = self.cursor.fetchall()
+
+            # Parse response stored in dictionary
+            schema = {}
+            for item in response:
+                # Columns are table name, column name, data type, length
+                attrs = schema.get(item[0], [])
+                attrs.append(item[1])
+                schema[item[0]] = attrs
+
+            # To log our database
+            print("Database schema as follows: ")
+            for t, table in enumerate(schema):
+                print(t + 1, table, schema.get(table))
+
+            self.interface.setSchema(schema)
         except Exception as e:
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
+
+if __name__ == "__main__":
+    cursorManager = CursorManager()
+    cursor = cursorManager.get_cursor()
+    plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
+
+    qep_tree = QEP_Tree().build(plan)
+    QEP_Tree().print_tree(qep_tree, 0)
