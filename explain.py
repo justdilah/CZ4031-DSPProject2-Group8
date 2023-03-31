@@ -71,7 +71,7 @@ class QEP_Tree():
             # if this condition satisfies then this is the root node
             if "->" not in cur_row and "Gather" not in cur_row and "cost=" in cur_row:
                 if self.root == None:
-                    match = re.match(r"^(\w+)?\s+\((.+)\)$", cur_row)
+                    match = re.match(r"^(.+)\s\s(.+)$", cur_row)
                     node = QEP_Node(0, match.group(1).strip(), match.group(2))
                     self.root = node
                     self.root.parent = self.root
@@ -83,6 +83,7 @@ class QEP_Tree():
                 indent_size = len(match.group(1))
                 operation = match.group(2).replace("Parallel", "")
                 details = match.group(3)
+
                 
                 node = QEP_Node(indent_size, operation.strip(), details)
 
@@ -117,7 +118,7 @@ class QEP_Tree():
         if node == None:
             return
         
-        print(" " * node.indent_size, "-> " + node.operation)
+        print("x" * node.indent_size, "-> " + node.operation)
 
         for child in node.children:
             self.traverse(child)
@@ -187,6 +188,9 @@ if __name__ == "__main__":
         )
     order by
       value desc;''')
+    
+    for row in plan:
+        print(row)
 
     qep_tree = QEP_Tree().build(plan)
     QEP_Tree().print_tree(qep_tree)
