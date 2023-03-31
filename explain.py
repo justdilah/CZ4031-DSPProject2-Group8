@@ -67,13 +67,24 @@ class QEP_Tree():
         cur_node = None
         for row in plan:
             cur_row = row[0]
+
+            # if this condition satisfies then this is the root node
+            if "->" not in cur_row and "Gather" not in cur_row and "cost=" in cur_row:
+                if self.root == None:
+                    match = re.match(r"^(\w+)?\s+\((.+)\)$", cur_row)
+                    node = QEP_Node(0, match.group(1).strip(), match.group(2))
+                    self.root = node
+                    self.root.parent = self.root
+                    cur_node = self.root
+                    self.prev_indent_size = 0
+
             if "->" in cur_row:
                 match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
                 indent_size = len(match.group(1))
                 operation = match.group(2).replace("Parallel", "")
                 details = match.group(3)
                 
-                node = QEP_Node(indent_size, operation, details)
+                node = QEP_Node(indent_size, operation.strip(), details)
 
                 if self.root == None:
                     self.root = node
@@ -98,20 +109,19 @@ class QEP_Tree():
     
     # for now prints the tree
     # later will need to adapt this to create the visuals
-    def print_tree(self, node: QEP_Node, depth: int):
-        print(self.traverse(node, depth))
+    def print_tree(self, node: QEP_Node):
+        self.traverse(node)
 
     # traverse the tree recursively
-    def traverse(self, node: QEP_Node, depth: int):
+    def traverse(self, node: QEP_Node):
         if node == None:
-            return ""
+            return
         
-        result = " " * depth + node.operation + "\n"
+        print(" " * node.indent_size, "-> " + node.operation)
 
         for child in node.children:
-            result += self.traverse(child, depth+1)
+            self.traverse(child)
         
-        return result
 
 class Explain():
     def __init__(self, interface, cursorManager: CursorManager):
@@ -147,7 +157,36 @@ class Explain():
 if __name__ == "__main__":
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
-    plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
+    # plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
+    plan = cursorManager.get_QEP(cursor, r'''explain select
+      ps_partkey,
+      sum(ps_supplycost * ps_availqty) as value
+    from
+      partsupp,
+      supplier,
+      nation
+    where
+      ps_suppkey = s_suppkey
+      and s_nationkey = n_nationkey
+      and n_name = 'GERMANY'
+      and ps_supplycost > 20
+      and s_acctbal > 10
+    group by
+      ps_partkey having
+        sum(ps_supplycost * ps_availqty) > (
+          select
+            sum(ps_supplycost * ps_availqty) * 0.0001000000
+          from
+            partsupp,
+            supplier,
+            nation
+          where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+        )
+    order by
+      value desc;''')
 
     qep_tree = QEP_Tree().build(plan)
-    QEP_Tree().print_tree(qep_tree, 0)
+    QEP_Tree().print_tree(qep_tree)
