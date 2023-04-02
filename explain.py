@@ -50,12 +50,13 @@ class CursorManager(object):
             return []
 
 class QEP_Node():
-    def __init__(self, indent_size: int, operation: str, details: str):
+    def __init__(self, indent_size: int, operation: str, details: str, step: list):
         self.indent_size = indent_size
         self.operation = operation
         self.details = details
         self.parent = None
         self.children = []
+        self.step = step
 
 class QEP_Tree():
     def __init__(self):
@@ -65,6 +66,11 @@ class QEP_Tree():
     # builds the QEP tree and returns the root node
     def build(self, plan):
         cur_node = None
+        node = None
+        cur_list = []
+        indent_size = 0
+        operation = "Ending Steps"
+        details = "NULL"
         for row in plan:
             cur_row = row[0]
 
@@ -79,6 +85,7 @@ class QEP_Tree():
                     self.prev_indent_size = 0
 
             if "->" in cur_row:
+                # node = QEP_Node(indent_size, operation, details,cur_list)
                 match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
                 indent_size = len(match.group(1))
                 operation = match.group(2).replace("Parallel", "")
@@ -105,6 +112,22 @@ class QEP_Tree():
 
                 self.prev_indent_size = indent_size
                 cur_node = node
+                   
+            else : 
+                # print(cur_row)
+                cur_list.append(cur_row)
+                
+        # # add the last item       
+        # node = QEP_Node(indent_size, operation, details,cur_list)
+        # # node is on the same level
+        # if self.prev_indent_size == indent_size:
+        #     parent = cur_node.parent
+        #     node.parent = parent
+        #     parent.children.append(node)
+        # else:
+        #     node.parent = cur_node
+        #     cur_node.children.append(node)
+                
 
         return self.root
     
