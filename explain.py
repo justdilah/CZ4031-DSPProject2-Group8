@@ -67,33 +67,35 @@ class QEP_Tree():
     def build(self, plan):
         cur_node = None
         node = None
-        cur_list = []
         indent_size = 0
+        cur_list = []
         operation = "Ending Steps"
         details = "NULL"
         for row in plan:
             cur_row = row[0]
-
+            
             # if this condition satisfies then this is the root node
             if "->" not in cur_row and "Gather" not in cur_row and "cost=" in cur_row:
                 if self.root == None:
                     match = re.match(r"^(.+)\s\s(.+)$", cur_row)
-                    node = QEP_Node(0, match.group(1).strip(), match.group(2))
+                    node = QEP_Node(0, match.group(1).strip(), match.group(2),cur_list)
+                    cur_list = []
                     self.root = node
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = 0
 
             if "->" in cur_row:
-                # node = QEP_Node(indent_size, operation, details,cur_list)
+                node = QEP_Node(indent_size, operation.strip(), details,cur_list)
                 match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
                 indent_size = len(match.group(1))
                 operation = match.group(2).replace("Parallel", "")
                 details = match.group(3)
 
+                # node = QEP_Node(indent_size, operation.strip(), details,cur_list)
                 
-                node = QEP_Node(indent_size, operation.strip(), details)
-
+                cur_list = []
+                
                 if self.root == None:
                     self.root = node
                     self.root.parent = self.root
@@ -117,16 +119,16 @@ class QEP_Tree():
                 # print(cur_row)
                 cur_list.append(cur_row)
                 
-        # # add the last item       
-        # node = QEP_Node(indent_size, operation, details,cur_list)
-        # # node is on the same level
-        # if self.prev_indent_size == indent_size:
-        #     parent = cur_node.parent
-        #     node.parent = parent
-        #     parent.children.append(node)
-        # else:
-        #     node.parent = cur_node
-        #     cur_node.children.append(node)
+        # add the last item       
+        node = QEP_Node(indent_size, operation.strip(), details,cur_list)
+        # node is on the same level
+        if self.prev_indent_size == indent_size:
+            parent = cur_node.parent
+            node.parent = parent
+            parent.children.append(node)
+        else:
+            node.parent = cur_node
+            cur_node.children.append(node)
                 
 
         return self.root
@@ -141,7 +143,8 @@ class QEP_Tree():
         if node == None:
             return
         
-        print("x" * node.indent_size, "-> " + node.operation)
+        print(" " * node.indent_size, "-> " + node.operation)
+        print(node.step)
 
         for child in node.children:
             self.traverse(child)
@@ -182,35 +185,79 @@ if __name__ == "__main__":
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
     # plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
-    plan = cursorManager.get_QEP(cursor, r'''explain select
-      ps_partkey,
-      sum(ps_supplycost * ps_availqty) as value
+    # plan = cursorManager.get_QEP(cursor, r'''explain select
+    #   ps_partkey,
+    #   sum(ps_supplycost * ps_availqty) as value
+    # from
+    #   partsupp,
+    #   supplier,
+    #   nation
+    # where
+    #   ps_suppkey = s_suppkey
+    #   and s_nationkey = n_nationkey
+    #   and n_name = 'GERMANY'
+    #   and ps_supplycost > 20
+    #   and s_acctbal > 10
+    # group by
+    #   ps_partkey having
+    #     sum(ps_supplycost * ps_availqty) > (
+    #       select
+    #         sum(ps_supplycost * ps_availqty) * 0.0001000000
+    #       from
+    #         partsupp,
+    #         supplier,
+    #         nation
+    #       where
+    #         ps_suppkey = s_suppkey
+    #         and s_nationkey = n_nationkey
+    #         and n_name = 'GERMANY'
+    #     )
+    # order by
+    #   value desc;''')
+    
+    plan = cursorManager.get_QEP(cursor, r'''explain
+      select
+      supp_nation,
+      cust_nation,
+      l_year,
+      sum(volume) as revenue
     from
-      partsupp,
-      supplier,
-      nation
-    where
-      ps_suppkey = s_suppkey
-      and s_nationkey = n_nationkey
-      and n_name = 'GERMANY'
-      and ps_supplycost > 20
-      and s_acctbal > 10
+      (
+        select
+          n1.n_name as supp_nation,
+          n2.n_name as cust_nation,
+          DATE_PART('YEAR',l_shipdate) as l_year,
+          l_extendedprice * (1 - l_discount) as volume
+        from
+          supplier,
+          lineitem,
+          orders,
+          customer,
+          nation n1,
+          nation n2
+        where
+          s_suppkey = l_suppkey
+          and o_orderkey = l_orderkey
+          and c_custkey = o_custkey
+          and s_nationkey = n1.n_nationkey
+          and c_nationkey = n2.n_nationkey
+          and (
+            (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+            or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+          )
+          and l_shipdate between '1995-01-01' and '1996-12-31'
+          and o_totalprice > 100
+          and c_acctbal > 10
+      ) as shipping
     group by
-      ps_partkey having
-        sum(ps_supplycost * ps_availqty) > (
-          select
-            sum(ps_supplycost * ps_availqty) * 0.0001000000
-          from
-            partsupp,
-            supplier,
-            nation
-          where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey
-            and n_name = 'GERMANY'
-        )
+      supp_nation,
+      cust_nation,
+      l_year
     order by
-      value desc;''')
+      supp_nation,
+      cust_nation,
+      l_year;
+      ''')
     
     for row in plan:
         print(row)
