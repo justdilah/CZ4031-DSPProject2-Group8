@@ -50,13 +50,13 @@ class CursorManager(object):
             return []
 
 class QEP_Node():
-    def __init__(self, indent_size: int, operation: str, details: str, step: list):
+    def __init__(self, indent_size: int, operation: str, details: str, raw: list):
         self.indent_size = indent_size
         self.operation = operation
         self.details = details
         self.parent = None
         self.children = []
-        self.step = step
+        self.raw = raw
 
 class QEP_Tree():
     def __init__(self):
