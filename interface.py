@@ -1,10 +1,14 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QUrl
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import *
 from PyQt5 import QtCore
-
+from gtts import gTTS
+import os
 
 class Ui_Form(object):
     def setupUi(self, Form):
+
         Form.setObjectName("CZ4031-Group8-DSPProject2")
         Form.resize(1165, 779)
 
@@ -208,6 +212,23 @@ class Ui_Form(object):
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
+        #---------------- Button Clicks -----------------------------
+        # On CLicked Methods for Submit Buttons
+        self.onClickedOldQueryButton()
+        self.onClickedNewQueryButton()
+
+        # Reset Button
+        self.onClickedResetButton()
+
+        # Text-to-speech capabilities
+        self.player = QMediaPlayer()
+
+        self.onClickedOldPlayButton()
+        self.onClickedOldStopButton()
+
+        self.onClickedNewPlayButton()
+        self.onClickedNewStopButton()
+
     def reset_text(self):
         self.newQueryInput.clear()
         self.oldQueryInput.clear()
@@ -219,8 +240,6 @@ class Ui_Form(object):
         return self.oldQueryInput.toPlainText()
     def getNewQueryInput(self):
         return self.newQueryInput.toPlainText()
-
-
 
     def showOldQEP(self, text):
         self.oldQEPOutput.setText(text)
@@ -262,3 +281,94 @@ class Ui_Form(object):
         self.newVisualLabel.setText(_translate("Form", "Visual Plan P\'"))
         self.resetButton.setText(_translate("Form", "Reset"))
 
+
+    def onClickedOldQueryButton(self):
+        self.oldQueryButton.clicked.connect(self.analyseOldQuery)
+    def onClickedNewQueryButton(self):
+        self.newQueryButton.clicked.connect(self.analyseNewQuery)
+    def onClickedResetButton(self):
+        self.resetButton.clicked.connect(lambda: self.oldQueryButton.setEnabled(True))
+        self.resetButton.clicked.connect(lambda: self.oldQueryInput.setReadOnly(False))
+        self.resetButton.clicked.connect(lambda: self.newQueryButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.newQueryInput.setReadOnly(True))
+
+        self.resetButton.clicked.connect(lambda: self.playOldButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.stopOldButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.playNewButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.stopNewButton.setEnabled(False))
+
+
+    def disabledStateForOldQuery(self):
+        self.oldQueryButton.setEnabled(False)
+        self.oldQueryInput.setReadOnly(True)
+
+    def analyseOldQuery(self):
+        query = self.getOldQueryInput()
+        if query.strip() != "":
+            self.showOldQEP(query.strip())
+            self.textToSpeech(self.oldQEPOutput.toPlainText(), "oldQuery")
+
+            self.stopOldButton.setEnabled(True)
+            self.playOldButton.setEnabled(True)
+            self.disabledStateForOldQuery()
+            self.newQueryButton.setEnabled(True)
+            self.newQueryInput.setReadOnly(False)
+        else:
+            self.showError("Please input Query Q")
+
+    def analyseNewQuery(self):
+        query = self.getNewQueryInput()
+        if query.strip() != "":
+            self.showNewQEP(query.strip())
+            self.textToSpeech(self.newQEPOutput.toPlainText(), "newQuery")
+
+            self.stopNewButton.setEnabled(True)
+            self.playNewButton.setEnabled(True)
+        else:
+            self.showError("Please input Query Q'")
+
+
+    # ----------------------------------- Text-to-Speech -----------------------------------------------------
+    def onClickedOldPlayButton(self):
+        self.playOldButton.clicked.connect(lambda: self.playAudioFile("oldQuery"))
+
+    def onClickedOldStopButton(self):
+        self.stopOldButton.clicked.connect(self.stopAudioFile)
+
+    def onClickedNewPlayButton(self):
+        self.playNewButton.clicked.connect(lambda: self.playAudioFile("newQuery"))
+
+    def onClickedNewStopButton(self):
+        self.stopNewButton.clicked.connect(self.stopAudioFile)
+
+    def textToSpeech(self, text, typeOfQuery):
+        speaker = gTTS(text=text, lang="en", slow=False)
+
+        file_path = os.path.join(os.getcwd(), typeOfQuery + str(".mp3"))
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # saves the text speech as an MP3
+        speaker.save(typeOfQuery + str(".mp3"))
+
+        # returns stat_result object
+        statbuf = os.stat(typeOfQuery + str(".mp3"))
+
+        # statbuf.st_size -> represents the size of the file in kbytes -> convert to MBytes
+        mbytes = statbuf.st_size / 1024
+
+        # MB / 200 MBPS -> to get the duration of the mp3 in seconds
+        duration = mbytes / 200
+
+    def stopAudioFile(self):
+        self.player.pause()
+
+    def playAudioFile(self, typeOfQuery):
+        mp3_name = typeOfQuery + str(".mp3")
+        file_path = os.path.join(os.getcwd(), mp3_name)
+        url = QUrl.fromLocalFile(file_path)
+
+        content = QMediaContent(url)
+        self.player.setMedia(QMediaContent())  # reset the media player
+        self.player.setMedia(content)
+        self.player.play()
