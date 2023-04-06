@@ -1,5 +1,4 @@
 import psycopg2
-from project import DatabaseCursor
 import time
 from PyQt5.QtWidgets import *
 import sys
@@ -21,22 +20,8 @@ class CursorManager(object):
         self.cursor = None
         
         self.__connect__()
-
-FILE_CONFIG = "config.json"
-
-class Explain:
-    def __init__(self, ui):
-        # Define configuration file
-        with open(FILE_CONFIG, "r") as file:
-            config = json.load(file)
-            print(config)
-            self.config = config["TPC-H"]
-
-        # Initialise UI
-        self.interface = ui
-
-        self.__connect__()
-
+        
+        
     def __connect__(self):
         try:
             self.conn = psycopg2.connect(
@@ -47,29 +32,9 @@ class Explain:
                 port=self._config["port"]
             )
             self.cursor = self.conn.cursor()
-            
+
         except Exception as e:
             print(f'Connection attempt failed with error: {e}')
-            
-        # # On CLicked Methods for Submit Buttons
-        # self.onClickedOldQueryButton()
-        # self.onClickedNewQueryButton()
-        #
-        # # Reset Button
-        # self.onClickedResetButton()
-
-        # # Text-to-speech capabilities
-        # self.player = QMediaPlayer()
-        #
-        # self.onClickedOldPlayButton()
-        # self.onClickedOldStopButton()
-        #
-        # self.onClickedNewPlayButton()
-        # self.onClickedNewStopButton()
-
-
-    def onDatabaseChanged(self):
-        self.updateSchema()
 
     def get_cursor(self):
         return self.cursor
@@ -79,10 +44,9 @@ class Explain:
             self.conn.close()
         except Exception as e:
             print(f'Cursor failed to close with error: {e}')
-
+            
     def get_QEP(self, cursor, query: str):
         try:
-
             cursor.execute(query)
             return cursor.fetchall()
         except Exception as e:
@@ -124,8 +88,6 @@ class QEP_Tree():
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = 0
-
-           # with DatabaseCursor(self.config) as cursor:
 
 
             if "->" in cur_row:
@@ -187,7 +149,7 @@ class QEP_Tree():
             return
         
         print(" " * node.indent_size, "-> " + node.operation)
-        print(node.step)
+        print(node.raw)
 
         for child in node.children:
             self.traverse(child)
@@ -227,7 +189,7 @@ class Explain():
 if __name__ == "__main__":
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
-    # plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
+    plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
     # plan = cursorManager.get_QEP(cursor, r'''explain select
     #   ps_partkey,
     #   sum(ps_supplycost * ps_availqty) as value
@@ -258,52 +220,54 @@ if __name__ == "__main__":
     # order by
     #   value desc;''')
     
-    plan = cursorManager.get_QEP(cursor, r'''explain
-      select
-      supp_nation,
-      cust_nation,
-      l_year,
-      sum(volume) as revenue
-    from
-      (
-        select
-          n1.n_name as supp_nation,
-          n2.n_name as cust_nation,
-          DATE_PART('YEAR',l_shipdate) as l_year,
-          l_extendedprice * (1 - l_discount) as volume
-        from
-          supplier,
-          lineitem,
-          orders,
-          customer,
-          nation n1,
-          nation n2
-        where
-          s_suppkey = l_suppkey
-          and o_orderkey = l_orderkey
-          and c_custkey = o_custkey
-          and s_nationkey = n1.n_nationkey
-          and c_nationkey = n2.n_nationkey
-          and (
-            (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
-            or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
-          )
-          and l_shipdate between '1995-01-01' and '1996-12-31'
-          and o_totalprice > 100
-          and c_acctbal > 10
-      ) as shipping
-    group by
-      supp_nation,
-      cust_nation,
-      l_year
-    order by
-      supp_nation,
-      cust_nation,
-      l_year;
-      ''')
+    # plan = cursorManager.get_QEP(cursor, r'''explain
+    #   select
+    #   supp_nation,
+    #   cust_nation,
+    #   l_year,
+    #   sum(volume) as revenue
+    # from
+    #   (
+    #     select
+    #       n1.n_name as supp_nation,
+    #       n2.n_name as cust_nation,
+    #       DATE_PART('YEAR',l_shipdate) as l_year,
+    #       l_extendedprice * (1 - l_discount) as volume
+    #     from
+    #       supplier,
+    #       lineitem,
+    #       orders,
+    #       customer,
+    #       nation n1,
+    #       nation n2
+    #     where
+    #       s_suppkey = l_suppkey
+    #       and o_orderkey = l_orderkey
+    #       and c_custkey = o_custkey
+    #       and s_nationkey = n1.n_nationkey
+    #       and c_nationkey = n2.n_nationkey
+    #       and (
+    #         (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+    #         or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+    #       )
+    #       and l_shipdate between '1995-01-01' and '1996-12-31'
+    #       and o_totalprice > 100
+    #       and c_acctbal > 10
+    #   ) as shipping
+    # group by
+    #   supp_nation,
+    #   cust_nation,
+    #   l_year
+    # order by
+    #   supp_nation,
+    #   cust_nation,
+    #   l_year;
+    #   ''')
     
-    for row in plan:
-        print(row)
+    
+## to cheeck on the QEP from gp admin
+    # for row in plan:
+    #     print(row)
 
     qep_tree = QEP_Tree().build(plan)
     QEP_Tree().print_tree(qep_tree)
@@ -351,4 +315,3 @@ if __name__ == "__main__":
     #     self.player.setMedia(QMediaContent())  # reset the media player
     #     self.player.setMedia(content)
     #     self.player.play()
-
