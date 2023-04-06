@@ -16,9 +16,11 @@ class CursorManager(object):
         except FileNotFoundError as e:
             raise e
 
-        # self._config = config["TPC-H"]
-        # self.conn = None
-        # self.cursor = None
+        self._config = config["TPC-H"]
+        self.conn = None
+        self.cursor = None
+        
+        self.__connect__()
 
 FILE_CONFIG = "config.json"
 
@@ -46,6 +48,9 @@ class Explain:
             )
             self.cursor = self.conn.cursor()
             
+        except Exception as e:
+            print(f'Connection attempt failed with error: {e}')
+            
         # # On CLicked Methods for Submit Buttons
         # self.onClickedOldQueryButton()
         # self.onClickedNewQueryButton()
@@ -65,9 +70,6 @@ class Explain:
 
     def onDatabaseChanged(self):
         self.updateSchema()
-
-        except Exception as e:
-            print(f'Connection attempt failed with error: {e}')
 
     def get_cursor(self):
         return self.cursor
