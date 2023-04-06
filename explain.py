@@ -1,20 +1,37 @@
 import psycopg2
+from project import DatabaseCursor
+import time
+from PyQt5.QtWidgets import *
+import sys
 import json
 import re
+
 
 class CursorManager(object):
     def __init__(self):
         self._CONFIG_PATH = "./config.json"
-
         try:
             with open(self._CONFIG_PATH, "r") as f:
                 config = json.load(f)
         except FileNotFoundError as e:
             raise e
 
-        self._config = config["TPC-H"]
-        self.conn = None
-        self.cursor = None
+        # self._config = config["TPC-H"]
+        # self.conn = None
+        # self.cursor = None
+
+FILE_CONFIG = "config.json"
+
+class Explain:
+    def __init__(self, ui):
+        # Define configuration file
+        with open(FILE_CONFIG, "r") as file:
+            config = json.load(file)
+            print(config)
+            self.config = config["TPC-H"]
+
+        # Initialise UI
+        self.interface = ui
 
         self.__connect__()
 
@@ -28,6 +45,26 @@ class CursorManager(object):
                 port=self._config["port"]
             )
             self.cursor = self.conn.cursor()
+            
+        # # On CLicked Methods for Submit Buttons
+        # self.onClickedOldQueryButton()
+        # self.onClickedNewQueryButton()
+        #
+        # # Reset Button
+        # self.onClickedResetButton()
+
+        # # Text-to-speech capabilities
+        # self.player = QMediaPlayer()
+        #
+        # self.onClickedOldPlayButton()
+        # self.onClickedOldStopButton()
+        #
+        # self.onClickedNewPlayButton()
+        # self.onClickedNewStopButton()
+
+
+    def onDatabaseChanged(self):
+        self.updateSchema()
 
         except Exception as e:
             print(f'Connection attempt failed with error: {e}')
@@ -43,6 +80,7 @@ class CursorManager(object):
 
     def get_QEP(self, cursor, query: str):
         try:
+
             cursor.execute(query)
             return cursor.fetchall()
         except Exception as e:
@@ -84,6 +122,9 @@ class QEP_Tree():
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = 0
+
+           # with DatabaseCursor(self.config) as cursor:
+
 
             if "->" in cur_row:
                 node = QEP_Node(indent_size, operation.strip(), details,cur_list)
@@ -264,3 +305,48 @@ if __name__ == "__main__":
 
     qep_tree = QEP_Tree().build(plan)
     QEP_Tree().print_tree(qep_tree)
+
+    # #----------------------------------- Text-to-Speech -----------------------------------------------------
+    # def onClickedOldPlayButton(self):
+    #     self.interface.playOldButton.clicked.connect(lambda: self.playAudioFile("oldQuery"))
+    #
+    # def onClickedOldStopButton(self):
+    #     self.interface.stopOldButton.clicked.connect(self.stopAudioFile)
+    #
+    # def onClickedNewPlayButton(self):
+    #     self.interface.playNewButton.clicked.connect(lambda: self.playAudioFile("newQuery"))
+    #
+    # def onClickedNewStopButton(self):
+    #     self.interface.stopNewButton.clicked.connect(self.stopAudioFile)
+    # def textToSpeech(self,text, typeOfQuery):
+    #
+    #     speaker = gTTS(text=text, lang="en", slow=False)
+    #
+    #     file_path = os.path.join(os.getcwd(), typeOfQuery + str(".mp3"))
+    #     if os.path.exists(file_path):
+    #         os.remove(file_path)
+    #
+    #     # saves the text speech as an MP3
+    #     speaker.save(typeOfQuery + str(".mp3"))
+    #
+    #     # returns stat_result object
+    #     statbuf = os.stat(typeOfQuery + str(".mp3"))
+    #
+    #     # statbuf.st_size -> represents the size of the file in kbytes -> convert to MBytes
+    #     mbytes = statbuf.st_size / 1024
+    #
+    #     # MB / 200 MBPS -> to get the duration of the mp3 in seconds
+    #     duration = mbytes / 200
+    #
+    # def stopAudioFile(self):
+    #     self.player.pause()
+    # def playAudioFile(self,typeOfQuery):
+    #     mp3_name = typeOfQuery + str(".mp3")
+    #     file_path = os.path.join(os.getcwd(), mp3_name)
+    #     url = QUrl.fromLocalFile(file_path)
+    #
+    #     content = QMediaContent(url)
+    #     self.player.setMedia(QMediaContent())  # reset the media player
+    #     self.player.setMedia(content)
+    #     self.player.play()
+
