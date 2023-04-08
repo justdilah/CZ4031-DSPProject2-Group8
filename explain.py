@@ -134,7 +134,8 @@ class QEP_Tree:
             condition_match = re.match(r"^([^\(])+", condition)
             if condition_match:
                 condition = condition_match.group(0).strip()
-                if condition[:-1] == ",":
+                if condition.strip()[:-1] == ",":
+                    print("here")
                     condition = condition[:-1]
 
             return f"{keyword} on {condition}"
@@ -339,6 +340,6 @@ if __name__ == "__main__":
     qep_tree = QEP_Tree().build(plan)
     QEP_Tree().print_tree(qep_tree)
     result = QEP_Tree().get_explanation(qep_tree)
-    
+
     for item in result:
         print(item)
