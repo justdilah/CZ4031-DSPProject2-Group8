@@ -3,7 +3,7 @@
     "host": "localhost",
     "dbname": "TPC-H",
     "user" : "postgres",
-    "pwd" : "root",
+    "pwd" : "admin",
     "port" : "5432"
   }
 }

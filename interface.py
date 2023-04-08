@@ -1,12 +1,17 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from PyQt5.QtCore import QUrl
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtWidgets import *
-
+from PyQt5 import QtCore
+from gtts import gTTS
+import os
 
 class Ui_Form(object):
     def setupUi(self, Form):
+
         Form.setObjectName("CZ4031-Group8-DSPProject2")
         Form.resize(1165, 779)
+
         self.horizontalLayoutWidget_2 = QtWidgets.QWidget(Form)
         self.horizontalLayoutWidget_2.setGeometry(QtCore.QRect(10, 20, 1141, 721))
         self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
@@ -26,14 +31,35 @@ class Ui_Form(object):
         self.databaseSchema = QTreeWidget(self.horizontalLayoutWidget_2)
         self.databaseSchema.setObjectName(u"databaseSchema")
         self.databaseSchema.setHeaderLabels(["Schema"])
+        # self.databaseSchema.setStyleSheet("background-color: white;")
+
+        # ----------------------- Instructions ------------------------------------------------
+        self.instructions = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
+        self.instructions.setObjectName("instructions")
+        self.instructions.setReadOnly(True)
+        instructionsString = ("1. Once the Query Q has been submitted,  'Submit Query' button will be DISABLED. Click on the Reset button to re-enable it.\n\n2. Query Q' and 'Submit Updated Query' button will only be enabled when Query Q has been submitted.\n\n"
+        "3. Creative Functionality: Improved user experience with Text-To-Speech capabilities to read your QEP for you! Press the 'Play' button under any of the QEP textboxes"
+         "to play the audio that reads out the QEP to you, and press the 'Stop' button to stop the audio at any time.")
+
+        self.instructions.setText(instructionsString)
+
+        self.instructionsLabel = QtWidgets.QLabel(self.horizontalLayoutWidget_2)
+        self.instructionsLabel.setObjectName("instructionsLabel")
+        self.instructionsLabel.setText("INSTRUCTIONS FOR USE")
+
+
 
         self.LeftLayout.addWidget(self.databaseSchema)
-        self.LeftLayout.addWidget(self.databaseSchema)
+        self.LeftLayout.addWidget(self.instructionsLabel)
+        self.LeftLayout.addWidget(self.instructions)
+
         self.mainHorizontalLayout.addLayout(self.LeftLayout)
         self.RightLayout = QtWidgets.QVBoxLayout()
         self.RightLayout.setObjectName("RightLayout")
         self.TopLayout = QtWidgets.QHBoxLayout()
         self.TopLayout.setObjectName("TopLayout")
+
+
 
         # -------------------------- OLD QUERY -----------------------------------------
         self.OldQueryLayout = QtWidgets.QVBoxLayout()
@@ -48,12 +74,12 @@ class Ui_Form(object):
         self.oldQueryInput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQueryInput.setObjectName("oldQueryInput")
         self.oldQueryInput.setReadOnly(False)
-
         self.OldQueryLayout.addWidget(self.oldQueryInput)
 
         # Old Query Button
         self.oldQueryButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.oldQueryButton.setObjectName("oldQueryButton")
+
         self.OldQueryLayout.addWidget(self.oldQueryButton)
         self.TopLayout.addLayout(self.OldQueryLayout)
         self.oldQEPLayout = QtWidgets.QVBoxLayout()
@@ -62,10 +88,36 @@ class Ui_Form(object):
         self.oldQEPLabel.setObjectName("oldQEPLabel")
         self.oldQEPLayout.addWidget(self.oldQEPLabel)
 
+
         # Display Old QEP Plan
         self.oldQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.oldQEPOutput.setObjectName("oldQEPOutput")
+
+        self.oldAudiohorizontalLayout = QtWidgets.QHBoxLayout()
+        # self.horizontalLayout = QHBoxLayout()
+        self.oldAudiohorizontalLayout.setObjectName(u"horizontalLayout")
+
+        # Play button
+        self.playOldButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.playOldButton.setObjectName("playOldButton")
+        self.playOldButton.setText("Play \U0001F50A")
+        self.playOldButton.setEnabled(False)
+        self.oldAudiohorizontalLayout.addWidget(self.playOldButton)
+
+
+        # Stop button
+        self.stopOldButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.stopOldButton.setObjectName("stopOldButton")
+        self.stopOldButton.setText("Stop \U0001F507")
+        self.stopOldButton.setEnabled(False)
+        self.oldAudiohorizontalLayout.addWidget(self.stopOldButton)
+        # self.horizontalLayoutWidget_2.addWidget(self.horizontalLayout)
+
         self.oldQEPLayout.addWidget(self.oldQEPOutput)
+        self.oldQEPLayout.addLayout(self.oldAudiohorizontalLayout)
+        # self.oldQEPLayout.addWidget(self.playOldButton)
+        # self.oldQEPLayout.addWidget(self.stopOldButton)
+
         self.TopLayout.addLayout(self.oldQEPLayout)
         self.oldVisualLayout = QtWidgets.QVBoxLayout()
         self.oldVisualLayout.setObjectName("oldVisualLayout")
@@ -76,6 +128,7 @@ class Ui_Form(object):
         # Display Old Visual Plan
         self.oldGraphicsView = QtWidgets.QGraphicsView(self.horizontalLayoutWidget_2)
         self.oldGraphicsView.setObjectName("oldGraphicsView")
+        # self.oldGraphicsView.setStyleSheet("background-color: white;")
         self.oldVisualLayout.addWidget(self.oldGraphicsView)
         self.TopLayout.addLayout(self.oldVisualLayout)
         self.RightLayout.addLayout(self.TopLayout)
@@ -94,12 +147,16 @@ class Ui_Form(object):
         # New Query Input
         self.newQueryInput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.newQueryInput.setObjectName("newQueryInput")
-        self.newQueryInput.setReadOnly(False)
+        self.newQueryInput.setReadOnly(True)
+
         self.NewQueryLayout.addWidget(self.newQueryInput)
+
 
         # New Query Button
         self.newQueryButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.newQueryButton.setObjectName("newQueryButton")
+        self.newQueryButton.setEnabled(False)
+
         self.NewQueryLayout.addWidget(self.newQueryButton)
         self.horizontalLayout_2.addLayout(self.NewQueryLayout)
         self.newQEPLayout = QtWidgets.QVBoxLayout()
@@ -111,7 +168,27 @@ class Ui_Form(object):
         # Display New QEP Plan
         self.newQEPOutput = QtWidgets.QTextBrowser(self.horizontalLayoutWidget_2)
         self.newQEPOutput.setObjectName("newQEPOutput")
+
+        self.newAudiohorizontalLayout = QtWidgets.QHBoxLayout()
+        # self.horizontalLayout = QHBoxLayout()
+        self.newAudiohorizontalLayout.setObjectName(u"newhorizontalLayout")
+
+        # Play button
+        self.playNewButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.playNewButton.setObjectName("playOldButton")
+        self.playNewButton.setText("Play \U0001F50A")
+        self.playNewButton.setEnabled(False)
+        self.newAudiohorizontalLayout.addWidget(self.playNewButton)
+
+        # Stop button
+        self.stopNewButton = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
+        self.stopNewButton.setObjectName("stopOldButton")
+        self.stopNewButton.setText("Stop \U0001F507")
+        self.stopNewButton.setEnabled(False)
+        self.newAudiohorizontalLayout.addWidget(self.stopNewButton)
+
         self.newQEPLayout.addWidget(self.newQEPOutput)
+        self.newQEPLayout.addLayout(self.newAudiohorizontalLayout)
         self.horizontalLayout_2.addLayout(self.newQEPLayout)
         self.newVisualLayout = QtWidgets.QVBoxLayout()
         self.newVisualLayout.setObjectName("newVisualLayout")
@@ -135,6 +212,23 @@ class Ui_Form(object):
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
+        #---------------- Button Clicks -----------------------------
+        # On CLicked Methods for Submit Buttons
+        self.onClickedOldQueryButton()
+        self.onClickedNewQueryButton()
+
+        # Reset Button
+        self.onClickedResetButton()
+
+        # Text-to-speech capabilities
+        self.player = QMediaPlayer()
+
+        self.onClickedOldPlayButton()
+        self.onClickedOldStopButton()
+
+        self.onClickedNewPlayButton()
+        self.onClickedNewStopButton()
+
     def reset_text(self):
         self.newQueryInput.clear()
         self.oldQueryInput.clear()
@@ -146,6 +240,21 @@ class Ui_Form(object):
         return self.oldQueryInput.toPlainText()
     def getNewQueryInput(self):
         return self.newQueryInput.toPlainText()
+
+    def showOldQEP(self, text):
+        self.oldQEPOutput.setText(text)
+    def showNewQEP(self, text):
+        self.newQEPOutput.setText(text)
+
+    def showError(self, errMessage, execption=None):
+        dialog = QMessageBox()
+        dialog.setStyleSheet("QLabel{min-width: 300px;}");
+        dialog.setWindowTitle("Error")
+        dialog.setText(errMessage)
+        if execption is not None:
+            dialog.setDetailedText(str(execption))
+        dialog.setStandardButtons(QMessageBox.Ok)
+        dialog.exec_()
 
     def setSchema(self, schema=None):
         self.databaseSchema.reset()
@@ -167,8 +276,99 @@ class Ui_Form(object):
         self.oldQEPLabel.setText(_translate("Form", "QEP P"))
         self.oldVisualLabel.setText(_translate("Form", "Visual Plan P"))
         self.newQueryLabel.setText(_translate("Form", "Query Q\'"))
-        self.newQueryButton.setText(_translate("Form", "Submit Update Query"))
+        self.newQueryButton.setText(_translate("Form", "Submit Updated Query"))
         self.newQEPLabel.setText(_translate("Form", "QEP P\'"))
         self.newVisualLabel.setText(_translate("Form", "Visual Plan P\'"))
         self.resetButton.setText(_translate("Form", "Reset"))
 
+
+    def onClickedOldQueryButton(self):
+        self.oldQueryButton.clicked.connect(self.analyseOldQuery)
+    def onClickedNewQueryButton(self):
+        self.newQueryButton.clicked.connect(self.analyseNewQuery)
+    def onClickedResetButton(self):
+        self.resetButton.clicked.connect(lambda: self.oldQueryButton.setEnabled(True))
+        self.resetButton.clicked.connect(lambda: self.oldQueryInput.setReadOnly(False))
+        self.resetButton.clicked.connect(lambda: self.newQueryButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.newQueryInput.setReadOnly(True))
+
+        self.resetButton.clicked.connect(lambda: self.playOldButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.stopOldButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.playNewButton.setEnabled(False))
+        self.resetButton.clicked.connect(lambda: self.stopNewButton.setEnabled(False))
+
+
+    def disabledStateForOldQuery(self):
+        self.oldQueryButton.setEnabled(False)
+        self.oldQueryInput.setReadOnly(True)
+
+    def analyseOldQuery(self):
+        query = self.getOldQueryInput()
+        if query.strip() != "":
+            self.showOldQEP(query.strip())
+            self.textToSpeech(self.oldQEPOutput.toPlainText(), "oldQuery")
+
+            self.stopOldButton.setEnabled(True)
+            self.playOldButton.setEnabled(True)
+            self.disabledStateForOldQuery()
+            self.newQueryButton.setEnabled(True)
+            self.newQueryInput.setReadOnly(False)
+        else:
+            self.showError("Please input Query Q")
+
+    def analyseNewQuery(self):
+        query = self.getNewQueryInput()
+        if query.strip() != "":
+            self.showNewQEP(query.strip())
+            self.textToSpeech(self.newQEPOutput.toPlainText(), "newQuery")
+
+            self.stopNewButton.setEnabled(True)
+            self.playNewButton.setEnabled(True)
+        else:
+            self.showError("Please input Query Q'")
+
+
+    # ----------------------------------- Text-to-Speech -----------------------------------------------------
+    def onClickedOldPlayButton(self):
+        self.playOldButton.clicked.connect(lambda: self.playAudioFile("oldQuery"))
+
+    def onClickedOldStopButton(self):
+        self.stopOldButton.clicked.connect(self.stopAudioFile)
+
+    def onClickedNewPlayButton(self):
+        self.playNewButton.clicked.connect(lambda: self.playAudioFile("newQuery"))
+
+    def onClickedNewStopButton(self):
+        self.stopNewButton.clicked.connect(self.stopAudioFile)
+
+    def textToSpeech(self, text, typeOfQuery):
+        speaker = gTTS(text=text, lang="en", slow=False)
+
+        file_path = os.path.join(os.getcwd(), typeOfQuery + str(".mp3"))
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # saves the text speech as an MP3
+        speaker.save(typeOfQuery + str(".mp3"))
+
+        # returns stat_result object
+        statbuf = os.stat(typeOfQuery + str(".mp3"))
+
+        # statbuf.st_size -> represents the size of the file in kbytes -> convert to MBytes
+        mbytes = statbuf.st_size / 1024
+
+        # MB / 200 MBPS -> to get the duration of the mp3 in seconds
+        duration = mbytes / 200
+
+    def stopAudioFile(self):
+        self.player.pause()
+
+    def playAudioFile(self, typeOfQuery):
+        mp3_name = typeOfQuery + str(".mp3")
+        file_path = os.path.join(os.getcwd(), mp3_name)
+        url = QUrl.fromLocalFile(file_path)
+
+        content = QMediaContent(url)
+        self.player.setMedia(QMediaContent())  # reset the media player
+        self.player.setMedia(content)
+        self.player.play()
