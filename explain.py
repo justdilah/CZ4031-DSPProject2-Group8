@@ -1,9 +1,8 @@
 import psycopg2
-import time
 from PyQt5.QtWidgets import *
-import sys
 import json
 import re
+from typing import List
 
 
 class CursorManager(object):
@@ -18,10 +17,9 @@ class CursorManager(object):
         self._config = config["TPC-H"]
         self.conn = None
         self.cursor = None
-        
+
         self.__connect__()
-        
-        
+
     def __connect__(self):
         try:
             self.conn = psycopg2.connect(
@@ -29,12 +27,12 @@ class CursorManager(object):
                 dbname=self._config["dbname"],
                 user=self._config["user"],
                 password=self._config["pwd"],
-                port=self._config["port"]
+                port=self._config["port"],
             )
             self.cursor = self.conn.cursor()
 
         except Exception as e:
-            print(f'Connection attempt failed with error: {e}')
+            print(f"Connection attempt failed with error: {e}")
 
     def get_cursor(self):
         return self.cursor
@@ -43,71 +41,67 @@ class CursorManager(object):
         try:
             self.conn.close()
         except Exception as e:
-            print(f'Cursor failed to close with error: {e}')
-            
+            print(f"Cursor failed to close with error: {e}")
+
     def get_QEP(self, cursor, query: str):
         try:
             cursor.execute(query)
             return cursor.fetchall()
         except Exception as e:
-            print(f'Cursor failed to execute query with error: {e}')
+            print(f"Cursor failed to execute query with error: {e}")
             return []
 
-class QEP_Node():
-    def __init__(self, indent_size: int, operation: str, details: str, raw: list):
+
+class QEP_Node:
+    def __init__(self, indent_size: int, operation: str, details: str):
         self.indent_size = indent_size
         self.operation = operation
         self.details = details
         self.parent = None
         self.children = []
-        self.raw = raw
+        self.explanation = []
 
-class QEP_Tree():
+
+class QEP_Tree:
     def __init__(self):
         self.root = None
         self.prev_indent_size = 0
 
     # builds the QEP tree and returns the root node
-    def build(self, plan):
+    def build(self, plan) -> QEP_Node:
         cur_node = None
         node = None
         indent_size = 0
-        cur_list = []
-        operation = "Ending Steps"
-        details = "NULL"
+        operation = ""
+        details = None
         for row in plan:
             cur_row = row[0]
-            
+
             # if this condition satisfies then this is the root node
             if "->" not in cur_row and "Gather" not in cur_row and "cost=" in cur_row:
                 if self.root == None:
                     match = re.match(r"^(.+)\s\s(.+)$", cur_row)
-                    node = QEP_Node(0, match.group(1).strip(), match.group(2),cur_list)
-                    cur_list = []
+                    node = QEP_Node(0, match.group(1).strip(), match.group(2))
                     self.root = node
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = 0
 
-
             if "->" in cur_row:
-                node = QEP_Node(indent_size, operation.strip(), details,cur_list)
                 match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
                 indent_size = len(match.group(1))
                 operation = match.group(2).replace("Parallel", "")
                 details = match.group(3)
 
-                # node = QEP_Node(indent_size, operation.strip(), details,cur_list)
-                
-                cur_list = []
-                
+                node = QEP_Node(indent_size, operation.strip(), details)
+
                 if self.root == None:
                     self.root = node
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = indent_size
                     continue
-        
+
                 # node is on the same level
                 if self.prev_indent_size == indent_size:
                     parent = cur_node.parent
@@ -116,46 +110,75 @@ class QEP_Tree():
                 else:
                     node.parent = cur_node
                     cur_node.children.append(node)
+            else:
+                if "Workers Planned" not in cur_row:
+                    explain_results = self.transformRawExplainToNaturalLanguage(cur_row)
+                else:
+                    explain_results = ""
 
-                self.prev_indent_size = indent_size
-                cur_node = node
-                   
-            else : 
-                # print(cur_row)
-                cur_list.append(cur_row)
-                
-        # add the last item       
-        node = QEP_Node(indent_size, operation.strip(), details,cur_list)
-        # node is on the same level
-        if self.prev_indent_size == indent_size:
-            parent = cur_node.parent
-            node.parent = parent
-            parent.children.append(node)
-        else:
-            node.parent = cur_node
-            cur_node.children.append(node)
-                
+                if explain_results == None or explain_results == "":
+                    continue
+
+                node.explanation.append(explain_results)
+
+            self.prev_indent_size = indent_size
+            cur_node = node
 
         return self.root
-    
+
+    def transformRawExplainToNaturalLanguage(self, raw_explain: List[str]) -> str:
+        match = re.match(r"(.*):\s(.*)", raw_explain)
+        if match:
+            keyword = match.group(1).strip()
+            condition = match.group(2).strip()
+            condition_match = re.match(r"^([^\(])+", condition)
+            if condition_match:
+                condition = condition_match.group(0).strip()
+                if condition[:-1] == ",":
+                    condition = condition[:-1]
+
+            return f"{keyword} on {condition}"
+
     # for now prints the tree
     # later will need to adapt this to create the visuals
     def print_tree(self, node: QEP_Node):
-        self.traverse(node)
-
-    # traverse the tree recursively
-    def traverse(self, node: QEP_Node):
         if node == None:
             return
-        
+
         print(" " * node.indent_size, "-> " + node.operation)
-        print(node.raw)
+        if node.explanation:
+            print(" " * (node.indent_size + 1), node.explanation)
 
         for child in node.children:
-            self.traverse(child)
-        
+            self.print_tree(child)
 
-class Explain():
+    def get_explanation(self, node: QEP_Node, resultList=[]) -> List[str]:
+        if node == None:
+            return []
+
+        for child in node.children:
+            self.get_explanation(child, resultList)
+
+        # print(node.operation)
+
+        operation = node.operation
+        explanation = (
+            node.explanation
+            if node.explanation != [] and node.explanation != None
+            else ""
+        )
+
+        if explanation == "":
+            result = f"Step {len(resultList) + 1}: Perform {operation}"
+        else:
+            result = f"Step {len(resultList) + 1}: Perform {operation} with {' and '.join(explanation)}"
+
+        resultList.append(result)
+
+        return resultList
+
+
+class Explain:
     def __init__(self, interface, cursorManager: CursorManager):
         self.interface = interface
         self.cursorManager = cursorManager
@@ -186,41 +209,85 @@ class Explain():
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
 
+    def get_QEP_tree(query: str) -> QEP_Node:
+        plan = cursorManager.get_QEP(query)
+        return QEP_Tree.build(plan)
+
+    def get_QEP_explanation(query: str) -> List[str]:
+        result = []
+
+
 if __name__ == "__main__":
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
-    plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
-    # plan = cursorManager.get_QEP(cursor, r'''explain select
-    #   ps_partkey,
-    #   sum(ps_supplycost * ps_availqty) as value
+    # plan = cursorManager.get_QEP(
+    #     cursor,
+    #     r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
+    # )
+
+    plan = cursorManager.get_QEP(
+        cursor,
+        r"""explain select
+      ps_partkey,
+      sum(ps_supplycost * ps_availqty) as value
+    from
+      partsupp,
+      supplier,
+      nation
+    where
+      ps_suppkey = s_suppkey
+      and s_nationkey = n_nationkey
+      and n_name = 'GERMANY'
+      and ps_supplycost > 20
+      and s_acctbal > 10
+    group by
+      ps_partkey having
+        sum(ps_supplycost * ps_availqty) > (
+          select
+            sum(ps_supplycost * ps_availqty) * 0.0001000000
+          from
+            partsupp,
+            supplier,
+            nation
+          where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+        )
+    order by
+      value desc;""",
+    )
+
+    # plan = cursorManager.get_QEP(
+    #     cursor,
+    #     r"""
+    #     explain select
+    #   l_returnflag,
+    #   l_linestatus,
+    #   sum(l_quantity) as sum_qty,
+    #   sum(l_extendedprice) as sum_base_price,
+    #   sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+    #   sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+    #   avg(l_quantity) as avg_qty,
+    #   avg(l_extendedprice) as avg_price,
+    #   avg(l_discount) as avg_disc,
+    #   count(*) as count_order
     # from
-    #   partsupp,
-    #   supplier,
-    #   nation
+    #   lineitem
     # where
-    #   ps_suppkey = s_suppkey
-    #   and s_nationkey = n_nationkey
-    #   and n_name = 'GERMANY'
-    #   and ps_supplycost > 20
-    #   and s_acctbal > 10
+    #   l_extendedprice > 100
     # group by
-    #   ps_partkey having
-    #     sum(ps_supplycost * ps_availqty) > (
-    #       select
-    #         sum(ps_supplycost * ps_availqty) * 0.0001000000
-    #       from
-    #         partsupp,
-    #         supplier,
-    #         nation
-    #       where
-    #         ps_suppkey = s_suppkey
-    #         and s_nationkey = n_nationkey
-    #         and n_name = 'GERMANY'
-    #     )
+    #   l_returnflag,
+    #   l_linestatus
     # order by
-    #   value desc;''')
-    
-    # plan = cursorManager.get_QEP(cursor, r'''explain
+    #   l_returnflag,
+    #   l_linestatus;
+    #     """,
+    # )
+
+    # plan = cursorManager.get_QEP(
+    #     cursor,
+    #     r"""explain
     #   select
     #   supp_nation,
     #   cust_nation,
@@ -262,56 +329,16 @@ if __name__ == "__main__":
     #   supp_nation,
     #   cust_nation,
     #   l_year;
-    #   ''')
-    
-    
-## to cheeck on the QEP from gp admin
-    # for row in plan:
-    #     print(row)
+    #   """,
+    # )
+
+    # to check on the QEP from PGadmin
+    for row in plan:
+        print(row)
 
     qep_tree = QEP_Tree().build(plan)
     QEP_Tree().print_tree(qep_tree)
-
-    # #----------------------------------- Text-to-Speech -----------------------------------------------------
-    # def onClickedOldPlayButton(self):
-    #     self.interface.playOldButton.clicked.connect(lambda: self.playAudioFile("oldQuery"))
-    #
-    # def onClickedOldStopButton(self):
-    #     self.interface.stopOldButton.clicked.connect(self.stopAudioFile)
-    #
-    # def onClickedNewPlayButton(self):
-    #     self.interface.playNewButton.clicked.connect(lambda: self.playAudioFile("newQuery"))
-    #
-    # def onClickedNewStopButton(self):
-    #     self.interface.stopNewButton.clicked.connect(self.stopAudioFile)
-    # def textToSpeech(self,text, typeOfQuery):
-    #
-    #     speaker = gTTS(text=text, lang="en", slow=False)
-    #
-    #     file_path = os.path.join(os.getcwd(), typeOfQuery + str(".mp3"))
-    #     if os.path.exists(file_path):
-    #         os.remove(file_path)
-    #
-    #     # saves the text speech as an MP3
-    #     speaker.save(typeOfQuery + str(".mp3"))
-    #
-    #     # returns stat_result object
-    #     statbuf = os.stat(typeOfQuery + str(".mp3"))
-    #
-    #     # statbuf.st_size -> represents the size of the file in kbytes -> convert to MBytes
-    #     mbytes = statbuf.st_size / 1024
-    #
-    #     # MB / 200 MBPS -> to get the duration of the mp3 in seconds
-    #     duration = mbytes / 200
-    #
-    # def stopAudioFile(self):
-    #     self.player.pause()
-    # def playAudioFile(self,typeOfQuery):
-    #     mp3_name = typeOfQuery + str(".mp3")
-    #     file_path = os.path.join(os.getcwd(), mp3_name)
-    #     url = QUrl.fromLocalFile(file_path)
-    #
-    #     content = QMediaContent(url)
-    #     self.player.setMedia(QMediaContent())  # reset the media player
-    #     self.player.setMedia(content)
-    #     self.player.play()
+    result = QEP_Tree().get_explanation(qep_tree)
+    
+    for item in result:
+        print(item)
