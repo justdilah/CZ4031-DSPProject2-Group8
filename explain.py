@@ -7,6 +7,8 @@ from typing import List
 """
 CursorManager to handle all transactions with postgres
 """
+
+
 class CursorManager(object):
     def __init__(self):
         self._CONFIG_PATH = "./config.json"
@@ -63,6 +65,7 @@ class QEP_Node:
         self.children = []
         self.explanation = []
 
+
 class QEP_Tree:
     def __init__(self):
         self.root = None
@@ -71,6 +74,7 @@ class QEP_Tree:
     """
     Builds the QEP tree and returns the root node
     """
+
     def build(self, plan) -> QEP_Node:
         cur_node = None
         node = None
@@ -81,7 +85,7 @@ class QEP_Tree:
             cur_row = row[0]
 
             # if this condition satisfies then this is the root node
-            if "->" not in cur_row and "Gather" not in cur_row and "cost=" in cur_row:
+            if "->" not in cur_row and "cost=" in cur_row:
                 if self.root == None:
                     match = re.match(r"^(.+)\s\s(.+)$", cur_row)
                     node = QEP_Node(0, match.group(1).strip(), match.group(2))
@@ -141,6 +145,7 @@ class QEP_Tree:
     Transform the raw explanation from postgres
     into a more refined natural language representation
     """
+
     def transformRawExplainToNaturalLanguage(self, raw_explain: List[str]) -> str:
         match = re.match(r"(.*):\s(.*)", raw_explain)
         if match:
@@ -150,15 +155,18 @@ class QEP_Tree:
             if condition_match:
                 condition = condition_match.group(0).strip()
                 if condition.strip()[:-1] == ",":
-                    print("here")
                     condition = condition[:-1]
 
             return f"{keyword} on {condition}"
+
+    def joinExplanationList(self, explanation_list: List[str]) -> str:
+        return " and ".join(explanation_list)
 
     """
     Prints the tree recursively using 
     pre order traversal for debugging purposes
     """
+
     def print_tree(self, node: QEP_Node):
         if node == None:
             return
@@ -174,7 +182,9 @@ class QEP_Tree:
     Traverses the QEP tree by specifying the root node of the particular tree
     recursively using post order traversal to get the steps and explanation
     for the tree
+    Returns a list of explanations of each step
     """
+
     def get_explanation(self, node: QEP_Node, resultList=[]) -> List[str]:
         if node == None:
             return []
@@ -192,11 +202,94 @@ class QEP_Tree:
         if explanation == "":
             result = f"Step {len(resultList) + 1}: Perform {operation}"
         else:
-            result = f"Step {len(resultList) + 1}: Perform {operation} with {' and '.join(explanation)}"
+            result = f"Step {len(resultList) + 1}: Perform {operation} with {self.joinExplanationList(explanation)}"
 
         resultList.append(result)
 
         return resultList
+
+    """
+    Compares 2 QEP trees by taking each tree's root node as argument
+    Traverses both trees to generate a queue of steps for each tree
+    Uses these queues to compare the actions taken by each tree
+    Returns a list of comparisons
+    """
+
+    def compareQEP(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
+        def get_node_queue(node: QEP_Node, queue: List[QEP_Node]) -> List[QEP_Node]:
+            if node == None:
+                return
+
+            for child in node.children:
+                get_node_queue(child, queue)
+
+            queue.append(node)
+
+            return queue
+
+        q1Queue = get_node_queue(node1, [])
+        q2Queue = get_node_queue(node2, [])
+
+        compareList = []
+        q1Pointer = q2Pointer = 0
+        while q1Pointer < len(q1Queue) and q2Pointer < len(q2Queue):
+            operationQ1 = q1Queue[q1Pointer].operation
+            explanationQ1 = q1Queue[q1Pointer].explanation
+            operationQ2 = q2Queue[q2Pointer].operation
+            explanationQ2 = q2Queue[q2Pointer].explanation
+            step = min(q1Pointer + 1, q2Pointer + 1)
+            if operationQ1 == operationQ2 and explanationQ1 == explanationQ2:
+                if not explanationQ1:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}."
+                else:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1} with {self.joinExplanationList(explanationQ1)}."
+            elif operationQ1 == operationQ2 and explanationQ1 != explanationQ2:
+                if not explanationQ1:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q2 has an additional condition to {self.joinExplanationList(explanationQ2)} while Q1 is just performing a basic {operationQ1}."
+                else:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q1 has an additional condition to {self.joinExplanationList(explanationQ1)} while Q2 is just performing a basic {operationQ2}."
+            elif operationQ1 != operationQ2:
+                if explanationQ1 and explanationQ2:
+                    compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} with {self.joinExplanationList(explanationQ1)} and Q2 executing a {operationQ2} with {self.joinExplanationList(explanationQ2)}."
+                elif explanationQ1 and not explanationQ2:
+                    compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} with {self.joinExplanationList(explanationQ1)} and Q2 executing a {operationQ2}."
+                elif not explanationQ1 and explanationQ2:
+                    compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} and Q2 executing a {operationQ2} with {self.joinExplanationList(explanationQ2)}."
+
+            compareList.append(compareExplanation)
+            q1Pointer += 1
+            q2Pointer += 1
+
+        line = (
+            "Additional steps taken for Q1"
+            if q1Pointer < len(q1Queue)
+            else "Additional steps taken for Q2"
+        )
+        compareList.append(line)
+
+        while q1Pointer < len(q1Queue):
+            operation = q1Queue[q1Pointer].operation
+            explanation = q1Queue[q1Pointer].explanation
+            step = q1Pointer + 1
+            if explanation:
+                compareExplanation = f"Step {step}: Q1 executes {operation} due to {self.joinExplanationList(explanation)} which doesn't exist in Q2"
+            else:
+                compareExplanation = f"Step {step}: Q1 executes {operation}"
+            compareList.append(compareExplanation)
+            q1Pointer += 1
+
+        while q2Pointer < len(q2Queue):
+            operation = q2Queue[q2Pointer].operation
+            explanation = q2Queue[q2Pointer].explanation
+            step = q2Pointer + 1
+            if explanation:
+                compareExplanation = f"Step {step}: Q2 executes {operation} due to {self.joinExplanationList(explanation)} which doesn't exist in Q1"
+            else:
+                compareExplanation = f"Step {step}: Q2 executes {operation}"
+            compareList.append(compareExplanation)
+            q2Pointer += 1
+
+        return compareList
 
 
 class Explain:
@@ -235,6 +328,7 @@ class Explain:
     Then builds the tree using the QEP_Tree class
     Returns the root node of the QEP tree
     """
+
     def get_QEP_tree(self, query: str) -> QEP_Node:
         plan = self.cursorManager.get_QEP("explain " + query)
         return QEP_Tree().build(plan)
@@ -244,130 +338,92 @@ class Explain:
     by passing in the root node of the specified tree
     as an argument
     """
+
     def get_QEP_explanation(self, node: QEP_Node) -> List[str]:
         return QEP_Tree().get_explanation(node)
 
 
 if __name__ == "__main__":
     cursorManager = CursorManager()
-    # plan = cursorManager.get_QEP(
-    #     cursor,
+    # plan1 = cursorManager.get_QEP(
+    #     r"explain select * from customer C, orders O where C.c_custkey = O.o_custkey"
+    # )
+    # plan2 = cursorManager.get_QEP(
     #     r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
     # )
 
-    # plan = cursorManager.get_QEP(
-    #     cursor,
-    #     r"""explain select
-    #   ps_partkey,
-    #   sum(ps_supplycost * ps_availqty) as value
-    # from
-    #   partsupp,
-    #   supplier,
-    #   nation
-    # where
-    #   ps_suppkey = s_suppkey
-    #   and s_nationkey = n_nationkey
-    #   and n_name = 'GERMANY'
-    #   and ps_supplycost > 20
-    #   and s_acctbal > 10
-    # group by
-    #   ps_partkey having
-    #     sum(ps_supplycost * ps_availqty) > (
-    #       select
-    #         sum(ps_supplycost * ps_availqty) * 0.0001000000
-    #       from
-    #         partsupp,
-    #         supplier,
-    #         nation
-    #       where
-    #         ps_suppkey = s_suppkey
-    #         and s_nationkey = n_nationkey
-    #         and n_name = 'GERMANY'
-    #     )
-    # order by
-    #   value desc;""",
-    # )
-
-    # plan = cursorManager.get_QEP(
-    #     cursor,
-    #     r"""
-    #     explain select
-    #   l_returnflag,
-    #   l_linestatus,
-    #   sum(l_quantity) as sum_qty,
-    #   sum(l_extendedprice) as sum_base_price,
-    #   sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
-    #   sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
-    #   avg(l_quantity) as avg_qty,
-    #   avg(l_extendedprice) as avg_price,
-    #   avg(l_discount) as avg_disc,
-    #   count(*) as count_order
-    # from
-    #   lineitem
-    # where
-    #   l_extendedprice > 100
-    # group by
-    #   l_returnflag,
-    #   l_linestatus
-    # order by
-    #   l_returnflag,
-    #   l_linestatus;
-    #     """,
-    # )
-
-    plan = cursorManager.get_QEP(
-        r"""explain
-      select
-      supp_nation,
-      cust_nation,
-      l_year,
-      sum(volume) as revenue
+    plan1 = cursorManager.get_QEP(
+        r"""explain select
+      ps_partkey,
+      sum(ps_supplycost * ps_availqty) as value
     from
-      (
-        select
-          n1.n_name as supp_nation,
-          n2.n_name as cust_nation,
-          DATE_PART('YEAR',l_shipdate) as l_year,
-          l_extendedprice * (1 - l_discount) as volume
-        from
-          supplier,
-          lineitem,
-          orders,
-          customer,
-          nation n1,
-          nation n2
-        where
-          s_suppkey = l_suppkey
-          and o_orderkey = l_orderkey
-          and c_custkey = o_custkey
-          and s_nationkey = n1.n_nationkey
-          and c_nationkey = n2.n_nationkey
-          and (
-            (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
-            or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
-          )
-          and l_shipdate between '1995-01-01' and '1996-12-31'
-          and o_totalprice > 100
-          and c_acctbal > 10
-      ) as shipping
+      partsupp,
+      supplier,
+      nation
+    where
+      ps_suppkey = s_suppkey
+      and s_nationkey = n_nationkey
+      and n_name = 'GERMANY'
+      and ps_supplycost > 20
+      and s_acctbal > 10
     group by
-      supp_nation,
-      cust_nation,
-      l_year
+      ps_partkey having
+        sum(ps_supplycost * ps_availqty) > (
+          select
+            sum(ps_supplycost * ps_availqty) * 0.0001000000
+          from
+            partsupp,
+            supplier,
+            nation
+          where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+        )
     order by
-      supp_nation,
-      cust_nation,
-      l_year;
-      """,
+      value desc;"""
     )
 
-    # to check on the QEP from PGadmin
-    for row in plan:
-        print(row)
+    plan2 = cursorManager.get_QEP(
+        r"""
+        explain select
+      l_returnflag,
+      l_linestatus,
+      sum(l_quantity) as sum_qty,
+      sum(l_extendedprice) as sum_base_price,
+      sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+      sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+      avg(l_quantity) as avg_qty,
+      avg(l_extendedprice) as avg_price,
+      avg(l_discount) as avg_disc,
+      count(*) as count_order
+    from
+      lineitem
+    where
+      l_extendedprice > 100
+    group by
+      l_returnflag,
+      l_linestatus
+    order by
+      l_returnflag,
+      l_linestatus;
+        """
+    )
 
-    qep_tree = QEP_Tree().build(plan)
-    QEP_Tree().print_tree(qep_tree)
-    result = QEP_Tree().get_explanation(qep_tree)
+    qep1 = QEP_Tree().build(plan1)
+    qep2 = QEP_Tree().build(plan2)
+    qep1_explain = QEP_Tree().get_explanation(qep1, [])
+    qep2_explain = QEP_Tree().get_explanation(qep2, [])
+    comparison = QEP_Tree().compareQEP(qep1, qep2)
 
-    for item in result:
-        print(item)
+    print("QEP1 Explain")
+    for explain in qep1_explain:
+        print(explain)
+
+    print("\nQEP2 Explain")
+    for explain in qep2_explain:
+        print(explain)
+
+    print("\nCompare QEP")
+    for compare in comparison:
+        print(compare)
