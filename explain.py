@@ -4,7 +4,9 @@ import json
 import re
 from typing import List
 
-
+"""
+CursorManager to handle all transactions with postgres
+"""
 class CursorManager(object):
     def __init__(self):
         self._CONFIG_PATH = "./config.json"
@@ -43,10 +45,10 @@ class CursorManager(object):
         except Exception as e:
             print(f"Cursor failed to close with error: {e}")
 
-    def get_QEP(self, cursor, query: str):
+    def get_QEP(self, query: str):
         try:
-            cursor.execute(query)
-            return cursor.fetchall()
+            self.cursor.execute(query)
+            return self.cursor.fetchall()
         except Exception as e:
             print(f"Cursor failed to execute query with error: {e}")
             return []
@@ -61,13 +63,14 @@ class QEP_Node:
         self.children = []
         self.explanation = []
 
-
 class QEP_Tree:
     def __init__(self):
         self.root = None
         self.prev_indent_size = 0
 
-    # builds the QEP tree and returns the root node
+    """
+    Builds the QEP tree and returns the root node
+    """
     def build(self, plan) -> QEP_Node:
         cur_node = None
         node = None
@@ -87,6 +90,10 @@ class QEP_Tree:
                     cur_node = self.root
                     self.prev_indent_size = 0
 
+            # If the row has '->' in it, then it is considered an operation in the QEP
+            # Process the rows with '->' and extract relevant information such as the
+            # operation, depth, and details (explanation)
+            # Indent size is used to determine if 2 nodes are on the same level
             if "->" in cur_row:
                 match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", cur_row)
                 indent_size = len(match.group(1))
@@ -103,6 +110,7 @@ class QEP_Tree:
                     continue
 
                 # node is on the same level
+                # get the parent node and attach it as its child
                 if self.prev_indent_size == indent_size:
                     parent = cur_node.parent
                     node.parent = parent
@@ -110,6 +118,8 @@ class QEP_Tree:
                 else:
                     node.parent = cur_node
                     cur_node.children.append(node)
+            # Row is an explanation row (without '->')
+            # Attach the explanations to the explanation list in the node
             else:
                 if "Workers Planned" not in cur_row:
                     explain_results = self.transformRawExplainToNaturalLanguage(cur_row)
@@ -121,11 +131,16 @@ class QEP_Tree:
 
                 node.explanation.append(explain_results)
 
+            # Update the current node pointer
             self.prev_indent_size = indent_size
             cur_node = node
 
         return self.root
 
+    """
+    Transform the raw explanation from postgres
+    into a more refined natural language representation
+    """
     def transformRawExplainToNaturalLanguage(self, raw_explain: List[str]) -> str:
         match = re.match(r"(.*):\s(.*)", raw_explain)
         if match:
@@ -140,8 +155,10 @@ class QEP_Tree:
 
             return f"{keyword} on {condition}"
 
-    # for now prints the tree
-    # later will need to adapt this to create the visuals
+    """
+    Prints the tree recursively using 
+    pre order traversal for debugging purposes
+    """
     def print_tree(self, node: QEP_Node):
         if node == None:
             return
@@ -153,14 +170,17 @@ class QEP_Tree:
         for child in node.children:
             self.print_tree(child)
 
+    """
+    Traverses the QEP tree by specifying the root node of the particular tree
+    recursively using post order traversal to get the steps and explanation
+    for the tree
+    """
     def get_explanation(self, node: QEP_Node, resultList=[]) -> List[str]:
         if node == None:
             return []
 
         for child in node.children:
             self.get_explanation(child, resultList)
-
-        # print(node.operation)
 
         operation = node.operation
         explanation = (
@@ -210,54 +230,63 @@ class Explain:
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
 
-    def get_QEP_tree(query: str) -> QEP_Node:
-        plan = cursorManager.get_QEP(query)
-        return QEP_Tree.build(plan)
+    """
+    Builds the QEP tree by first getting the plan from postgres
+    Then builds the tree using the QEP_Tree class
+    Returns the root node of the QEP tree
+    """
+    def get_QEP_tree(self, query: str) -> QEP_Node:
+        plan = self.cursorManager.get_QEP("explain " + query)
+        return QEP_Tree().build(plan)
 
-    def get_QEP_explanation(query: str) -> List[str]:
-        result = []
+    """
+    Gets the explanation for the specified QEP tree
+    by passing in the root node of the specified tree
+    as an argument
+    """
+    def get_QEP_explanation(self, node: QEP_Node) -> List[str]:
+        return QEP_Tree().get_explanation(node)
 
 
 if __name__ == "__main__":
     cursorManager = CursorManager()
-    cursor = cursorManager.get_cursor()
     # plan = cursorManager.get_QEP(
     #     cursor,
     #     r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
     # )
 
-    plan = cursorManager.get_QEP(
-        cursor,
-        r"""explain select
-      ps_partkey,
-      sum(ps_supplycost * ps_availqty) as value
-    from
-      partsupp,
-      supplier,
-      nation
-    where
-      ps_suppkey = s_suppkey
-      and s_nationkey = n_nationkey
-      and n_name = 'GERMANY'
-      and ps_supplycost > 20
-      and s_acctbal > 10
-    group by
-      ps_partkey having
-        sum(ps_supplycost * ps_availqty) > (
-          select
-            sum(ps_supplycost * ps_availqty) * 0.0001000000
-          from
-            partsupp,
-            supplier,
-            nation
-          where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey
-            and n_name = 'GERMANY'
-        )
-    order by
-      value desc;""",
-    )
+    # plan = cursorManager.get_QEP(
+    #     cursor,
+    #     r"""explain select
+    #   ps_partkey,
+    #   sum(ps_supplycost * ps_availqty) as value
+    # from
+    #   partsupp,
+    #   supplier,
+    #   nation
+    # where
+    #   ps_suppkey = s_suppkey
+    #   and s_nationkey = n_nationkey
+    #   and n_name = 'GERMANY'
+    #   and ps_supplycost > 20
+    #   and s_acctbal > 10
+    # group by
+    #   ps_partkey having
+    #     sum(ps_supplycost * ps_availqty) > (
+    #       select
+    #         sum(ps_supplycost * ps_availqty) * 0.0001000000
+    #       from
+    #         partsupp,
+    #         supplier,
+    #         nation
+    #       where
+    #         ps_suppkey = s_suppkey
+    #         and s_nationkey = n_nationkey
+    #         and n_name = 'GERMANY'
+    #     )
+    # order by
+    #   value desc;""",
+    # )
 
     # plan = cursorManager.get_QEP(
     #     cursor,
@@ -286,52 +315,51 @@ if __name__ == "__main__":
     #     """,
     # )
 
-    # plan = cursorManager.get_QEP(
-    #     cursor,
-    #     r"""explain
-    #   select
-    #   supp_nation,
-    #   cust_nation,
-    #   l_year,
-    #   sum(volume) as revenue
-    # from
-    #   (
-    #     select
-    #       n1.n_name as supp_nation,
-    #       n2.n_name as cust_nation,
-    #       DATE_PART('YEAR',l_shipdate) as l_year,
-    #       l_extendedprice * (1 - l_discount) as volume
-    #     from
-    #       supplier,
-    #       lineitem,
-    #       orders,
-    #       customer,
-    #       nation n1,
-    #       nation n2
-    #     where
-    #       s_suppkey = l_suppkey
-    #       and o_orderkey = l_orderkey
-    #       and c_custkey = o_custkey
-    #       and s_nationkey = n1.n_nationkey
-    #       and c_nationkey = n2.n_nationkey
-    #       and (
-    #         (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
-    #         or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
-    #       )
-    #       and l_shipdate between '1995-01-01' and '1996-12-31'
-    #       and o_totalprice > 100
-    #       and c_acctbal > 10
-    #   ) as shipping
-    # group by
-    #   supp_nation,
-    #   cust_nation,
-    #   l_year
-    # order by
-    #   supp_nation,
-    #   cust_nation,
-    #   l_year;
-    #   """,
-    # )
+    plan = cursorManager.get_QEP(
+        r"""explain
+      select
+      supp_nation,
+      cust_nation,
+      l_year,
+      sum(volume) as revenue
+    from
+      (
+        select
+          n1.n_name as supp_nation,
+          n2.n_name as cust_nation,
+          DATE_PART('YEAR',l_shipdate) as l_year,
+          l_extendedprice * (1 - l_discount) as volume
+        from
+          supplier,
+          lineitem,
+          orders,
+          customer,
+          nation n1,
+          nation n2
+        where
+          s_suppkey = l_suppkey
+          and o_orderkey = l_orderkey
+          and c_custkey = o_custkey
+          and s_nationkey = n1.n_nationkey
+          and c_nationkey = n2.n_nationkey
+          and (
+            (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+            or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+          )
+          and l_shipdate between '1995-01-01' and '1996-12-31'
+          and o_totalprice > 100
+          and c_acctbal > 10
+      ) as shipping
+    group by
+      supp_nation,
+      cust_nation,
+      l_year
+    order by
+      supp_nation,
+      cust_nation,
+      l_year;
+      """,
+    )
 
     # to check on the QEP from PGadmin
     for row in plan:
