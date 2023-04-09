@@ -329,7 +329,7 @@ class Explain:
     Returns the root node of the QEP tree
     """
 
-    def get_QEP_tree(self, query: str) -> QEP_Node:
+    def build_QEP_tree(self, query: str) -> QEP_Node:
         plan = self.cursorManager.get_QEP("explain " + query)
         return QEP_Tree().build(plan)
 
@@ -337,10 +337,20 @@ class Explain:
     Gets the explanation for the specified QEP tree
     by passing in the root node of the specified tree
     as an argument
+    Returns the arguments in a list
     """
 
     def get_QEP_explanation(self, node: QEP_Node) -> List[str]:
         return QEP_Tree().get_explanation(node)
+
+    """
+    Gets the comparisons for the specifed QEP trees by passing each tree's root
+    node as arguments
+    Returns the comparisons in a list
+    """
+
+    def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
+        return QEP_Tree().compareQEP(node1, node2)
 
 
 if __name__ == "__main__":
