@@ -2,7 +2,7 @@ import interface
 from explain import *
 from PyQt5 import QtCore, QtGui, QtWidgets
 from qt_material import apply_stylesheet
-
+from matplotlib import pyplot as plt, patches
 
 
 import psycopg2
@@ -37,9 +37,6 @@ def main():
 
     cursorManager = CursorManager()
     explain = Explain(ui, cursorManager)
-
-
-    # explainObject = explain.Explain(ui)
 
 
     form.show()

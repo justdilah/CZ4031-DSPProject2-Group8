@@ -147,7 +147,7 @@ class QEP_Tree():
     def traverse(self, node: QEP_Node):
         if node == None:
             return
-        
+
         print(" " * node.indent_size, "-> " + node.operation)
         print(node.raw)
 
@@ -187,6 +187,21 @@ class Explain():
             print("Retrieval of Schema information is unsuccessful!")
 
 if __name__ == "__main__":
+    test = "   YOYUOYOO"
+    print(test.count(" "))
+
+    strTest = " -> Ending Steps\n" + "['Gather  (cost=5366.32..65519.75 rows=151 width=266)', '  Workers Planned: 2']\n" + "     -> Hash Join\n" + "['        Hash Cond: (o.o_custkey = c.c_custkey)']\n" + "           -> Seq Scan on orders o\n" + "[]\n" + "           -> Hash\n" + "[]\n" + "                 -> Seq Scan on customer c\n" +"[                    Filter: ((c_name)::text ~~ '%cheng'::text)]\n"
+
+    strArray = strTest.split("\n")
+    strArray = strArray[:-1]
+
+    strArray = [x for x in strArray if "[" not in x]
+    # for str in strArray:
+    print(strArray)
+    for strVar in strArray:
+        print(strVar)
+        print(strVar.split("-")[0].count(" "))
+
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
     plan = cursorManager.get_QEP(cursor, r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'")
@@ -268,9 +283,9 @@ if __name__ == "__main__":
 ## to cheeck on the QEP from gp admin
     # for row in plan:
     #     print(row)
-
-    qep_tree = QEP_Tree().build(plan)
-    QEP_Tree().print_tree(qep_tree)
+    #
+    # qep_tree = QEP_Tree().build(plan)
+    # QEP_Tree().print_tree(qep_tree)
 
     # #----------------------------------- Text-to-Speech -----------------------------------------------------
     # def onClickedOldPlayButton(self):
