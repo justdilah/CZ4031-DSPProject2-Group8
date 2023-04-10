@@ -10,3 +10,6 @@ Project 2 Implementation for CZ4031 DATABASE SYSTEM PRINCIPLES
 - pip install psycopg2
 - pip install qt-material
 - pip install gTTS
+- pip install networkx
+- pip install matplotlib
+- pip install scipy
