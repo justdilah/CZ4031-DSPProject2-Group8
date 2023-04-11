@@ -308,8 +308,8 @@ class Explain():
             else :
                 explaination.append("The query here has been changed")
                 
-        print(change)
-        print(explaination)
+        # print(change)
+        # print(explaination)
         
         return explaination
     
