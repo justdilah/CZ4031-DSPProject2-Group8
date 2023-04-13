@@ -178,6 +178,17 @@ class QEP_Tree:
         for child in node.children:
             self.print_tree(child)
 
+    def get_visual_plan(self, node: QEP_Node, planList: List[str]) -> List[str]:
+        if node == None:
+            return
+
+        planList.append(" " * node.indent_size + "-> " + node.operation)
+
+        for child in node.children:
+            self.get_visual_plan(child, planList)
+
+        return planList
+
     """
     Traverses the QEP tree by specifying the root node of the particular tree
     recursively using post order traversal to get the steps and explanation
@@ -324,6 +335,13 @@ class Explain:
             print("Retrieval of Schema information is unsuccessful!")
 
     """
+    Returns the visual plan in a List[str] format
+    """
+
+    def get_visual_plan(self, node: QEP_Node) -> List[str]:
+        return QEP_Tree().get_visual_plan(node)
+
+    """
     Builds the QEP tree by first getting the plan from postgres
     Then builds the tree using the QEP_Tree class
     Returns the root node of the QEP tree
@@ -355,70 +373,70 @@ class Explain:
 
 if __name__ == "__main__":
     cursorManager = CursorManager()
-    # plan1 = cursorManager.get_QEP(
-    #     r"explain select * from customer C, orders O where C.c_custkey = O.o_custkey"
-    # )
-    # plan2 = cursorManager.get_QEP(
-    #     r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
-    # )
-
     plan1 = cursorManager.get_QEP(
-        r"""explain select
-      ps_partkey,
-      sum(ps_supplycost * ps_availqty) as value
-    from
-      partsupp,
-      supplier,
-      nation
-    where
-      ps_suppkey = s_suppkey
-      and s_nationkey = n_nationkey
-      and n_name = 'GERMANY'
-      and ps_supplycost > 20
-      and s_acctbal > 10
-    group by
-      ps_partkey having
-        sum(ps_supplycost * ps_availqty) > (
-          select
-            sum(ps_supplycost * ps_availqty) * 0.0001000000
-          from
-            partsupp,
-            supplier,
-            nation
-          where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey
-            and n_name = 'GERMANY'
-        )
-    order by
-      value desc;"""
+        r"explain select * from customer C, orders O where C.c_custkey = O.o_custkey"
+    )
+    plan2 = cursorManager.get_QEP(
+        r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
     )
 
-    plan2 = cursorManager.get_QEP(
-        r"""
-        explain select
-      l_returnflag,
-      l_linestatus,
-      sum(l_quantity) as sum_qty,
-      sum(l_extendedprice) as sum_base_price,
-      sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
-      sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
-      avg(l_quantity) as avg_qty,
-      avg(l_extendedprice) as avg_price,
-      avg(l_discount) as avg_disc,
-      count(*) as count_order
-    from
-      lineitem
-    where
-      l_extendedprice > 100
-    group by
-      l_returnflag,
-      l_linestatus
-    order by
-      l_returnflag,
-      l_linestatus;
-        """
-    )
+    # plan1 = cursorManager.get_QEP(
+    #     r"""explain select
+    #   ps_partkey,
+    #   sum(ps_supplycost * ps_availqty) as value
+    # from
+    #   partsupp,
+    #   supplier,
+    #   nation
+    # where
+    #   ps_suppkey = s_suppkey
+    #   and s_nationkey = n_nationkey
+    #   and n_name = 'GERMANY'
+    #   and ps_supplycost > 20
+    #   and s_acctbal > 10
+    # group by
+    #   ps_partkey having
+    #     sum(ps_supplycost * ps_availqty) > (
+    #       select
+    #         sum(ps_supplycost * ps_availqty) * 0.0001000000
+    #       from
+    #         partsupp,
+    #         supplier,
+    #         nation
+    #       where
+    #         ps_suppkey = s_suppkey
+    #         and s_nationkey = n_nationkey
+    #         and n_name = 'GERMANY'
+    #     )
+    # order by
+    #   value desc;"""
+    # )
+
+    # plan2 = cursorManager.get_QEP(
+    #     r"""
+    #     explain select
+    #   l_returnflag,
+    #   l_linestatus,
+    #   sum(l_quantity) as sum_qty,
+    #   sum(l_extendedprice) as sum_base_price,
+    #   sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+    #   sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+    #   avg(l_quantity) as avg_qty,
+    #   avg(l_extendedprice) as avg_price,
+    #   avg(l_discount) as avg_disc,
+    #   count(*) as count_order
+    # from
+    #   lineitem
+    # where
+    #   l_extendedprice > 100
+    # group by
+    #   l_returnflag,
+    #   l_linestatus
+    # order by
+    #   l_returnflag,
+    #   l_linestatus;
+    #     """
+    # )
 
     qep1 = QEP_Tree().build(plan1)
     qep2 = QEP_Tree().build(plan2)
@@ -437,3 +455,7 @@ if __name__ == "__main__":
     print("\nCompare QEP")
     for compare in comparison:
         print(compare)
+
+    visual_plan = QEP_Tree().get_visual_plan(qep1, [])
+    for r in visual_plan:
+        print(r)
