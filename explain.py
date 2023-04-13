@@ -7,6 +7,7 @@ from typing import List
 """
 CursorManager to handle all transactions with postgres
 """
+import difflib
 
 
 class CursorManager(object):
@@ -196,7 +197,7 @@ class QEP_Tree:
     Returns a list of explanations of each step
     """
 
-    def get_explanation(self, node: QEP_Node, resultList=[]) -> List[str]:
+    def get_explanation(self, node: QEP_Node, resultList) -> List[str]:
         if node == None:
             return []
 
@@ -339,7 +340,7 @@ class Explain:
     """
 
     def get_visual_plan(self, node: QEP_Node) -> List[str]:
-        return QEP_Tree().get_visual_plan(node)
+        return QEP_Tree().get_visual_plan(node, [])
 
     """
     Builds the QEP tree by first getting the plan from postgres
@@ -359,7 +360,7 @@ class Explain:
     """
 
     def get_QEP_explanation(self, node: QEP_Node) -> List[str]:
-        return QEP_Tree().get_explanation(node)
+        return QEP_Tree().get_explanation(node, [])
 
     """
     Gets the comparisons for the specifed QEP trees by passing each tree's root
@@ -369,6 +370,121 @@ class Explain:
 
     def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
         return QEP_Tree().compareQEP(node1, node2)
+
+    def compare_sql(string1, string2):
+        # Split the strings into lines
+        lines1 = string1.splitlines()
+        lines2 = string2.splitlines()
+
+        # Compare the lines using the Differ class
+        differ = difflib.Differ()
+        diff = list(differ.compare(lines1, lines2))
+
+        # Store the differences in a list
+        differences = []
+        temp = []
+        sign = ""
+        pre = ""
+        for line in diff:
+            text = line[2:]
+            if (sign.startswith("-") and line.startswith("+")) or (
+                sign.startswith("+") and line.startswith("-")
+            ):
+                differences.append(temp)
+                temp = []
+            if len(temp) == 0 and line.startswith("-"):
+                temp.append(("SQL old removed\n", text))
+                sign = "-"
+            elif len(temp) == 0 and line.startswith("+"):
+                temp.append(("SQL new added\n", text))
+                sign = "+"
+            elif line.startswith("+") and pre.startswith("+"):
+                temp.append(("       ", text))  # SQL 2
+            elif line.startswith("-") and pre.startswith("-"):
+                temp.append(("       ", text))  # SQL 1
+            elif line.startswith("?"):
+                continue
+
+            pre = line
+
+        if len(temp) != 0:
+            differences.append(temp)
+
+        return differences
+
+    def explainSQL(diffArray):
+        line1 = ""
+        line2 = ""
+        pretype = ""
+        change = []
+        explaination = []
+
+        for i in diffArray:
+            for diff_type, line in i:
+                if diff_type == "SQL new added\n" or diff_type == "SQL old removed\n":
+                    pretype = diff_type
+
+                if pretype == "SQL old removed\n":
+                    if line1 and line2:
+                        string1_words = re.split(r"[ _-]+", line1)
+                        string2_words = re.split(r"[ _-]+", line2)
+
+                        for i in range(min(len(string1_words), len(string2_words))):
+                            if string1_words[i] != string2_words[i]:
+                                change.append([string1_words[i], string2_words[i]])
+                        line1 = ""
+                        line2 = ""
+
+                if line1 == "" or pretype == "SQL old removed\n":
+                    line1 += line
+                    continue
+                elif line2 == "" or pretype == "SQL new added\n":
+                    line2 += line
+                    continue
+
+        if line1 and line2:
+            string1_words = re.split(r"[ _-]+", line1)
+            string2_words = re.split(r"[ _-]+", line2)
+
+            for i in range(min(len(string1_words), len(string2_words))):
+                if string1_words[i] != string2_words[i]:
+                    change.append([string1_words[i], string2_words[i]])
+
+        for i in change:
+            if i[0].isnumeric() and i[1].isnumeric():
+                explaination.append("There is a change in value")
+            elif i[0].isnumeric() and (i[1].isalnum() or i[1].isalpha()):
+                explaination.append("There is a change from a value to a variable")
+            elif i[1].isnumeric() and (i[0].isalnum() or i[0].isalpha()):
+                explaination.append("There is a change from a variable to a value")
+            elif (i[0].isalnum() or i[0].isalpha()) and (
+                i[1].isalnum() or i[1].isalpha()
+            ):
+                explaination.append("There is a change in variable")
+            else:
+                explaination.append("The query here has been changed")
+
+        return explaination
+
+    def printSQLexplain(differences, explain):
+        oldtype = ""
+        newtype = ""
+        c = 0
+
+        for i in differences:
+            for diff_type, line in i:
+                print(f"{diff_type} {line}")
+
+                if diff_type == "SQL old removed\n":
+                    oldtype = diff_type
+                elif diff_type == "SQL new added\n":
+                    newtype = diff_type
+
+            if oldtype and newtype:
+                print("\nExplaination : " + explain[c] + "\n=========================")
+                c += 1
+                oldtype = ""
+                newtype = ""
 
 
 if __name__ == "__main__":
@@ -380,8 +496,62 @@ if __name__ == "__main__":
         r"EXPLAIN select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'",
     )
 
-    # plan1 = cursorManager.get_QEP(
-    #     r"""explain select
+    cursorManager = CursorManager()
+    cursor = cursorManager.get_cursor()
+    # sql = "explain select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'"
+    sql = """explain 
+        select
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) as value
+        from
+            partsupp,
+            supplier,
+            nation
+        where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+            and ps_supplycost > 20
+            and s_acctbal > 10
+        group by
+            ps_partkey having
+                sum(ps_supplycost * ps_availqty) > 1
+        order by
+            value desc;"""
+
+    sql2 = """explain 
+        select
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) as value
+        from
+            partsupp,
+            supplier,
+            nation
+        where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey1
+            and n_name = 'GERMANY'
+            and ps_supplycost > 100
+            and s_acctbal > 10
+        group by
+            ps_partkey having
+                sum(ps_supplycost * ps_availqty) > (
+                select
+                    sum(ps_supplycost * ps_availqty) * 0.0001000000
+                from
+                    partsupport,
+                    supplierbyme,
+                    nation
+                where
+                    ps_suppkey = s_suppkey
+                    and s_nationkey = n_nationkey
+                    and n_name = 'GERMANY'
+                )
+        order by
+            value desc;"""
+
+    # plan = cursorManager.get_QEP(cursor, sql)
+    # plan = cursorManager.get_QEP(cursor, r'''explain select
     #   ps_partkey,
     #   sum(ps_supplycost * ps_availqty) as value
     # from
@@ -443,6 +613,10 @@ if __name__ == "__main__":
     qep1_explain = QEP_Tree().get_explanation(qep1, [])
     qep2_explain = QEP_Tree().get_explanation(qep2, [])
     comparison = QEP_Tree().compareQEP(qep1, qep2)
+
+    differences = Explain.compare_sql(sql, sql2)
+    explaination = Explain.explainSQL(differences)
+    Explain.printSQLexplain(differences, explaination)
 
     print("QEP1 Explain")
     for explain in qep1_explain:
