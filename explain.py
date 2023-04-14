@@ -318,6 +318,7 @@ class Explain:
         self.cursor = self.cursorManager.get_cursor()
         # self.updateSchema()
 
+    # ROLLBACKS TRANSACTION IF THERE ARE ISSUES
     def rollback(self):
         self.cursorManager.conn.rollback()
     def updateSchema(self):

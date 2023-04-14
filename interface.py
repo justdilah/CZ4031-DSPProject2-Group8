@@ -40,7 +40,6 @@ class Ui_Form(object):
         self.databaseSchema.setObjectName(u"databaseSchema")
         self.databaseSchema.setHeaderLabels(["Schema"])
         self.databaseSchema.setStyleSheet("font: 8pt")
-        # self.databaseSchema.setStyleSheet("background-color: white;")
 
         # ----------------------- Instructions ------------------------------------------------
         self.instructions = QtWidgets.QTextBrowser(Form)
@@ -58,14 +57,11 @@ class Ui_Form(object):
             " to play the audio that reads out the explanations to you, and press the 'Stop' button to stop the audio at any time.")
         self.instructions.setText(instructionsString)
 
-
         # Label
         self.instructionsLabel = QtWidgets.QLabel(Form)
         self.instructionsLabel.setObjectName("instructionsLabel")
         self.instructionsLabel.setText("INSTRUCTIONS FOR USE")
         self.instructionsLabel.setStyleSheet("font: 8pt")
-
-
 
         self.LeftLayout.addWidget(self.databaseSchema)
         self.LeftLayout.addWidget(self.instructionsLabel)
