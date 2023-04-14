@@ -65,6 +65,7 @@ class QEP_Node:
         self.parent = None
         self.children = []
         self.explanation = []
+        self.step = None
 
 
 class QEP_Tree:
@@ -113,7 +114,7 @@ class QEP_Tree:
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = indent_size
-                    i+=1
+                    i += 1
                     continue
 
                 # node is on the same level
@@ -130,18 +131,17 @@ class QEP_Tree:
                     while j > 0:
                         prev_row = plan[j - 1][0]
                         if "->" in prev_row:
-                            prev_match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", prev_row)
+                            prev_match = re.match(
+                                r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", prev_row
+                            )
                             prev_indent_size = len(prev_match.group(1))
-                            prev_operation = prev_match.group(2).replace("Parallel", "")
                             if prev_indent_size == indent_size:
-                                print(prev_operation, operation, prev_indent_size, indent_size)
                                 p = self.findParent(self.root, prev_indent_size)
-                                print("pfound", p.operation, p.indent_size)
                                 if len(p.children) < 2:
                                     p.children.append(node)
                                     node.parent = p
                                     break
-                        j-=1
+                        j -= 1
                 else:
                     node.parent = cur_node
                     if len(cur_node.children) < 2:
@@ -155,7 +155,7 @@ class QEP_Tree:
                     explain_results = ""
 
                 if explain_results == None or explain_results == "":
-                    i+=1
+                    i += 1
                     continue
 
                 node.explanation.append(explain_results)
@@ -163,16 +163,17 @@ class QEP_Tree:
             # Update the current node pointer
             self.prev_indent_size = indent_size
             cur_node = node
-            i+=1
+            i += 1
 
         return self.root
-    
+
     def findParent(self, node: QEP_Node, indentSize):
-        if node == None: return
+        if node == None:
+            return
 
         if indentSize == node.indent_size:
             return node.parent
-        
+
         for child in node.children:
             return self.findParent(child, indentSize)
 
@@ -231,16 +232,12 @@ class QEP_Tree:
     Returns a list of explanations of each step
     """
 
-    def get_explanation(self, node: QEP_Node, resultList) -> List[str]:
+    def get_explanation(self, node: QEP_Node, resultList: List[str]) -> List[str]:
         if node == None:
             return []
 
         for child in node.children:
             self.get_explanation(child, resultList)
-
-        print(" " * node.indent_size, "-> " + node.operation)
-        if node.explanation:
-            print(" " * (node.indent_size + 1), node.explanation)
 
         operation = node.operation
         explanation = (
@@ -249,10 +246,21 @@ class QEP_Tree:
             else ""
         )
 
-        if explanation == "":
-            result = f"Step {len(resultList) + 1}: Perform {operation}"
+        step = len(resultList) + 1
+        if explanation == "" and (
+            "join" not in operation.lower()
+            and "hash" not in operation.lower()
+            and "nested loop" not in operation.lower()
+        ):
+            result = f"Step {step}: Perform {operation}"
+        elif "join" in operation.lower() or "nested loop" in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step} and {node.children[1].step}"
+        elif "hash" in operation.lower() and "join" not in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step}"
         else:
-            result = f"Step {len(resultList) + 1}: Perform {operation} with {self.joinExplanationList(explanation)}"
+            result = f"Step {step}: Perform {operation} with {self.joinExplanationList(explanation)}"
+
+        node.step = step
 
         resultList.append(result)
 
@@ -393,7 +401,7 @@ class Explain:
     """
 
     def build_QEP_tree(self, query: str) -> QEP_Node:
-        plan = self.cursorManager.get_QEP("explain " + query)
+        plan = self.cursorManager.get_QEP(r"explain " + query)
         return QEP_Tree().build(plan)
 
     """
@@ -529,61 +537,3 @@ class Explain:
                 c += 1
                 oldtype = ""
                 newtype = ""
-
-if __name__ == "__main__":
-    cm = CursorManager()
-    explain = Explain(cm)
-    q = '''
-select
-      o_year,
-      sum(case
-        when nation = 'BRAZIL' then volume
-        else 0
-      end) / sum(volume) as mkt_share
-    from
-      (
-        select
-          DATE_PART('YEAR',o_orderdate) as o_year,
-          l_extendedprice * (1 - l_discount) as volume,
-          n2.n_name as nation
-        from
-          part,
-          supplier,
-          lineitem,
-          orders,
-          customer,
-          nation n1,
-          nation n2,
-          region
-        where
-          p_partkey = l_partkey
-          and s_suppkey = l_suppkey
-          and l_orderkey = o_orderkey
-          and o_custkey = c_custkey
-          and c_nationkey = n1.n_nationkey
-          and n1.n_regionkey = r_regionkey
-          and r_name = 'AMERICA'
-          and s_nationkey = n2.n_nationkey
-          and o_orderdate between '1995-01-01' and '1996-12-31'
-          and p_type = 'ECONOMY ANODIZED STEEL'
-          and s_acctbal > 10
-          and l_extendedprice > 100
-      ) as all_nations
-    group by
-      o_year
-    order by
-      o_year;
-    '''
-    tree = explain.build_QEP_tree(q)
-    QEP_Tree().print_tree(tree)
-    print("-" * 40)
-
-    e = explain.get_QEP_explanation(tree)
-    print("-" * 40)
-    for r in e:
-        print(r)
-    print("-" * 40)
-
-    plan = cm.get_QEP("explain " + q)
-    for r in plan:
-        print(r)
