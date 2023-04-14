@@ -505,21 +505,25 @@ class Explain:
         newtype = ""
         c = 0
 
-        for i in differences:
-            for diff_type, line in i:
+        if len(differences) == 0 and len(explain) == 0:
+            concatString = concatString + ("There are no differences between the 2 SQL queries")
 
-                concatString = concatString + diff_type + line + "<br><br>"
-                print(f"{diff_type} {line}")
-                if diff_type == "<b>SQL old removed</b><br><br>":
-                    oldtype = diff_type
-                elif diff_type == "<b>SQL new added</b><br><br>":
-                    newtype = diff_type
+        else:
+            for i in differences:
+                for diff_type, line in i:
 
-            if oldtype and newtype:
-                concatString = concatString + ("<br><b>Explaination :</b><br><br> " + explain[c] + "<br>===================")
-                # print("<br>Explaination : " + explain[c] + "<br>=========================")
-                c += 1
-                oldtype = ""
-                newtype = ""
+                    concatString = concatString + diff_type + line + "<br><br>"
+                    print(f"{diff_type} {line}")
+                    if diff_type == "<b>SQL old removed</b><br><br>":
+                        oldtype = diff_type
+                    elif diff_type == "<b>SQL new added</b><br><br>":
+                        newtype = diff_type
+
+                if oldtype and newtype:
+                    concatString = concatString + ("<br><b>Explaination :</b><br><br> " + explain[c] + "<br>===================")
+                    # print("<br>Explaination : " + explain[c] + "<br>=========================")
+                    c += 1
+                    oldtype = ""
+                    newtype = ""
         concatString = concatString + "</p>"
         return concatString

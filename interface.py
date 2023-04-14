@@ -599,7 +599,7 @@ class Ui_Form(object):
 
             concatDiffSQL = self.explainObj.concatDifferencesExplainSQL(differences, explaination)
 
-
+            print(concatDiffSQL)
             self.showDiffBetweenSQL(concatDiffSQL)
             self.textToSpeech(self.diffBetweenSQLInput.toPlainText(), "oldQuery")
 
