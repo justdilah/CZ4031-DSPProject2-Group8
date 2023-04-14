@@ -9,7 +9,6 @@ CursorManager to handle all transactions with postgres
 """
 import difflib
 
-
 class CursorManager(object):
     def __init__(self):
         self._CONFIG_PATH = "./config.json"
@@ -390,7 +389,7 @@ class Explain:
             # self.interface.setSchema(schema)
         except Exception as e:
             print(str(e))
-            print("Retrieval of Schema information is unsuccessful!")
+            print("Retrieval of Schema information is unsuccessful!")          
 
     """
     Returns the visual plan in a List[str] format
@@ -429,11 +428,37 @@ class Explain:
 
     def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
         return QEP_Tree().compareQEP(node1, node2)
+        
+    def stripString (str):
+        # Remove leading/trailing whitespace and split into lines
+        sql_lines = str.lower().strip().split('\n')
+        stripped_list = [s.strip() for s in sql_lines]
 
-    def compare_sql(self,string1, string2):
+        # print(stripped_list)
+        # Join lines back together with no separator
+        result = ' '.join(stripped_list)
+            
+        keywords = ["from", "where","or","like","group by","order by"]
+        sections = []
+        start_index = 0
+        pre = ""
+
+        for keyword in keywords:
+            index = result.find(keyword)
+            if index != -1:
+                sections.append(pre + " " +result[start_index:index].strip())
+                # sections.append(keyword)
+                start_index = index + len(keyword)
+                pre = keyword
+
+        sections.append(pre + " " +result[start_index:].strip())
+        return sections 
+
+    def compare_sql(string1, string2):
         # Split the strings into lines
-        lines1 = string1.splitlines()
-        lines2 = string2.splitlines()
+        lines1 = Explain.stripString(string1)
+        lines2 = Explain.stripString(string2)
+
 
         # Compare the lines using the Differ class
         differ = difflib.Differ()
@@ -458,10 +483,10 @@ class Explain:
                 temp.append(("<b>SQL new added</b><br><br>", text))
                 sign = "+"
             elif line.startswith("+") and pre.startswith("+"):
-                temp.append(("       ", text))  # SQL 2
+                temp.append(("", text)) # SQL 2
             elif line.startswith("-") and pre.startswith("-"):
-                temp.append(("       ", text))  # SQL 1
-            elif line.startswith("?"):
+                temp.append(("", text)) # SQL 1 
+            elif line.startswith("?") : 
                 continue
 
             pre = line
@@ -470,6 +495,8 @@ class Explain:
             differences.append(temp)
 
         return differences
+
+
 
     def explainSQL(self,diffArray):
         line1 = ""
