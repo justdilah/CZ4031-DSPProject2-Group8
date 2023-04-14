@@ -475,8 +475,8 @@ if __name__ == "__main__":
     # QEP_Tree().print_tree(qep_tree)
     
     differences = Explain.compare_sql(sql, sql2)
-    explaination = Explain.explainSQL(differences)
-    Explain.printSQLexplain(differences,explaination)
+    explanation = Explain.explainSQL(differences)
+    Explain.printSQLexplain(differences,explanation)
     
     # for i in differences:
     #     for n, m in i:
