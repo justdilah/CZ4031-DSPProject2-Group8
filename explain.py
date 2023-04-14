@@ -65,6 +65,7 @@ class QEP_Node:
         self.parent = None
         self.children = []
         self.explanation = []
+        self.step = None
 
     def returnExplanation(self):
         return self.explanation
@@ -84,6 +85,7 @@ class QEP_Tree:
         indent_size = 0
         operation = ""
         details = None
+        i = 0
         for row in plan:
             cur_row = row[0]
 
@@ -114,6 +116,7 @@ class QEP_Tree:
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = indent_size
+                    i += 1
                     continue
 
                 # node is on the same level
@@ -122,9 +125,29 @@ class QEP_Tree:
                     parent = cur_node.parent
                     node.parent = parent
                     parent.children.append(node)
+
+                # further down the tree there are child nodes
+                # so have to go back up the plan to find it's parent
+                elif self.prev_indent_size > indent_size:
+                    j = i
+                    while j > 0:
+                        prev_row = plan[j - 1][0]
+                        if "->" in prev_row:
+                            prev_match = re.match(
+                                r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", prev_row
+                            )
+                            prev_indent_size = len(prev_match.group(1))
+                            if prev_indent_size == indent_size:
+                                p = self.findParent(self.root, prev_indent_size)
+                                if len(p.children) < 2:
+                                    p.children.append(node)
+                                    node.parent = p
+                                    break
+                        j -= 1
                 else:
                     node.parent = cur_node
-                    cur_node.children.append(node)
+                    if len(cur_node.children) < 2:
+                        cur_node.children.append(node)
             # Row is an explanation row (without '->')
             # Attach the explanations to the explanation list in the node
             else:
@@ -134,6 +157,7 @@ class QEP_Tree:
                     explain_results = ""
 
                 if explain_results == None or explain_results == "":
+                    i += 1
                     continue
 
                 node.explanation.append(explain_results)
@@ -141,8 +165,19 @@ class QEP_Tree:
             # Update the current node pointer
             self.prev_indent_size = indent_size
             cur_node = node
+            i += 1
 
         return self.root
+
+    def findParent(self, node: QEP_Node, indentSize):
+        if node == None:
+            return
+
+        if indentSize == node.indent_size:
+            return node.parent
+
+        for child in node.children:
+            return self.findParent(child, indentSize)
 
     """
     Transform the raw explanation from postgres
@@ -199,7 +234,7 @@ class QEP_Tree:
     Returns a list of explanations of each step
     """
 
-    def get_explanation(self, node: QEP_Node, resultList) -> List[str]:
+    def get_explanation(self, node: QEP_Node, resultList: List[str]) -> List[str]:
         if node == None:
             return []
 
@@ -213,10 +248,21 @@ class QEP_Tree:
             else ""
         )
 
-        if explanation == "":
-            result = f"Step {len(resultList) + 1}: Perform {operation}"
+        step = len(resultList) + 1
+        if explanation == "" and (
+            "join" not in operation.lower()
+            and "hash" not in operation.lower()
+            and "nested loop" not in operation.lower()
+        ):
+            result = f"Step {step}: Perform {operation}"
+        elif "join" in operation.lower() or "nested loop" in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step} and {node.children[1].step}"
+        elif "hash" in operation.lower() and "join" not in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step}"
         else:
-            result = f"Step {len(resultList) + 1}: Perform {operation} with {self.joinExplanationList(explanation)}"
+            result = f"Step {step}: Perform {operation} with {self.joinExplanationList(explanation)}"
+
+        node.step = step
 
         resultList.append(result)
 
@@ -362,7 +408,7 @@ class Explain:
     """
 
     def build_QEP_tree(self, query: str) -> QEP_Node:
-        plan = self.cursorManager.get_QEP("explain " + query)
+        plan = self.cursorManager.get_QEP(r"explain " + query)
         return QEP_Tree().build(plan)
 
     """
