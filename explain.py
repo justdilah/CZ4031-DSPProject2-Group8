@@ -256,7 +256,9 @@ class QEP_Tree:
                 else:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1} with {self.joinExplanationList(explanationQ1)}."
             elif operationQ1 == operationQ2 and explanationQ1 != explanationQ2:
-                if not explanationQ1:
+                if explanationQ1 and explanationQ2:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q1 and Q2 have different conditions on the operations with Q1 to {self.joinExplanationList(explanationQ1)} and Q2 to {self.joinExplanationList(explanationQ2)}."
+                elif explanationQ1 and not explanationQ2:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q2 has an additional condition to {self.joinExplanationList(explanationQ2)} while Q1 is just performing a basic {operationQ1}."
                 else:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q1 has an additional condition to {self.joinExplanationList(explanationQ1)} while Q2 is just performing a basic {operationQ2}."
@@ -267,15 +269,18 @@ class QEP_Tree:
                     compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} with {self.joinExplanationList(explanationQ1)} and Q2 executing a {operationQ2}."
                 elif not explanationQ1 and explanationQ2:
                     compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} and Q2 executing a {operationQ2} with {self.joinExplanationList(explanationQ2)}."
+                else:
+                    compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} and Q2 executing a {operationQ2}."
 
             compareList.append(compareExplanation)
+            compareExplanation = ""
             q1Pointer += 1
             q2Pointer += 1
 
         line = (
-            "Additional steps taken for Q1"
+            "Q1 has additional steps taken due to the change in query.\nAdditional steps taken by Q1:"
             if q1Pointer < len(q1Queue)
-            else "Additional steps taken for Q2"
+            else "Q2 has additional steps taken due to the change in query.\nAdditional steps taken by Q2:"
         )
         compareList.append(line)
 
