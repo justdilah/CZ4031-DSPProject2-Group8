@@ -10,7 +10,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form, explainObj):
+        self.explainObj = explainObj
         if Form.objectName():
             Form.setObjectName(u"CZ4031-Group8-DSPProject2")
         Form.resize(1167, 794)
@@ -41,6 +42,7 @@ class Ui_Form(object):
 
         # ----------------------- Instructions ------------------------------------------------
         self.instructions = QtWidgets.QTextBrowser(Form)
+        # self.instructions.set
         self.instructions.setObjectName("instructions")
         self.instructions.setReadOnly(True)
         instructionsString = ("1. Once the Query Q has been submitted,  'Submit Query' button will be DISABLED. Click on the Reset button to re-enable it.\n\n2. Query Q' and 'Submit Updated Query' button will only be enabled when Query Q has been submitted.\n\n"
@@ -48,6 +50,7 @@ class Ui_Form(object):
          "to play the audio that reads out the QEP to you, and press the 'Stop' button to stop the audio at any time.")
 
         self.instructions.setText(instructionsString)
+
 
         self.instructionsLabel = QtWidgets.QLabel(Form)
         self.instructionsLabel.setObjectName("instructionsLabel")
@@ -180,8 +183,8 @@ class Ui_Form(object):
         self.newQEPLayout.addWidget(self.newQEPLabel)
 
         # Display New QEP Plan
-        self.newQEPOutput = QtWidgets.QTextBrowser(Form)
-        self.newQEPOutput.setObjectName("newQEPOutput")
+        self.diffBetweenQEPInput = QtWidgets.QTextBrowser(Form)
+        self.diffBetweenQEPInput.setObjectName("diffBetweenQEPInput")
 
         self.newAudiohorizontalLayout = QtWidgets.QHBoxLayout()
         # self.horizontalLayout = QHBoxLayout()
@@ -201,7 +204,7 @@ class Ui_Form(object):
         self.stopNewButton.setEnabled(False)
         self.newAudiohorizontalLayout.addWidget(self.stopNewButton)
 
-        self.newQEPLayout.addWidget(self.newQEPOutput)
+        self.newQEPLayout.addWidget(self.diffBetweenQEPInput)
         self.newQEPLayout.addLayout(self.newAudiohorizontalLayout)
         self.bottomLayout.addLayout(self.newQEPLayout)
         self.newVisualLayout = QtWidgets.QVBoxLayout()
@@ -274,13 +277,11 @@ class Ui_Form(object):
 
         self.onClickedMaxImageButton()
 
-
-
     def reset_text(self):
         self.newQueryInput.clear()
         self.oldQueryInput.clear()
 
-        self.newQEPOutput.clear()
+        self.diffBetweenQEPInput.clear()
         self.oldQEPOutput.clear()
 
     def getOldQueryInput(self):
@@ -291,7 +292,7 @@ class Ui_Form(object):
     def showOldQEP(self, text):
         self.oldQEPOutput.setText(text)
     def showNewQEP(self, text):
-        self.newQEPOutput.setText(text)
+        self.diffBetweenQEPInput.setText(text)
 
     # Displays error message
     def showError(self, errMessage, execption=None):
@@ -305,7 +306,7 @@ class Ui_Form(object):
         dialog.exec_()
 
     # Generates QEP image to be displayed
-    def generateQEP(self,type,pgsql_qep_output):
+    def generateQEP(self,type,queryInput):
         # text output of passed qep
         # pgsql_qep_output = """
         #  -> Ending Steps
@@ -335,9 +336,15 @@ class Ui_Form(object):
         # ["                          Filter: (l_extendedprice > '100'::numeric)"]
         # """
 
+        QEPtree1 = self.explainObj.build_QEP_tree(queryInput)
+        visualPlan1 = self.explainObj.get_visual_plan(QEPtree1)
+
+        qep_output = ""
+        for vs1Item in visualPlan1:
+            qep_output = qep_output + vs1Item + '\n'
+
         # take only text which has "->" which indicates the nodes except "-> Ending Steps"
-        strArray = pgsql_qep_output.strip().split("\n")
-        strArray = strArray[:-1]
+        strArray = qep_output.strip().split("\n")
         strArray = [x for x in strArray if "[" not in x]
         qep_output = [x for x in strArray if "Ending" not in x]
 
@@ -371,6 +378,7 @@ class Ui_Form(object):
                 else:
                     break
             output_dict[label] = children
+
 
         # # Create a new graph
         first_value = output_dict[list(output_dict.keys())[0]]
@@ -459,10 +467,10 @@ class Ui_Form(object):
         lay.addWidget(dialog.newGraphicsView)
         dialog.exec_()
 
-
-
-    def setSchema(self, schema=None):
+    def setSchema(self):
         self.databaseSchema.reset()
+        schema = self.explainObj.updateSchema()
+
         if schema is None:
             return
         for table in schema:
@@ -471,6 +479,7 @@ class Ui_Form(object):
                 attr_item = QTreeWidgetItem([attr])
                 table_item.addChild(attr_item)
             self.databaseSchema.addTopLevelItem(table_item)
+
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
@@ -533,7 +542,7 @@ class Ui_Form(object):
         ["                                                  Filter: ((n_name = 'FRANCE'::bpchar) OR (n_name = 'GERMANY'::bpchar))"]
         # """
 
-        self.oldQueryButton.clicked.connect(lambda: self.generateQEP("old",pgsql_qep_output))
+        self.oldQueryButton.clicked.connect(lambda: self.generateQEP("old",self.getOldQueryInput()))
     def onClickedNewQueryButton(self):
 
         pgsql_qep_output = """
@@ -549,9 +558,14 @@ class Ui_Form(object):
         ["                    Filter: ((c_name)::text ~~ '%cheng'::text)"]
         """
 
-        self.showNewVisualPlanFullBtn.clicked.connect(lambda: self.showNewVisualPlanFullBtn.setEnabled(True))
+
+
+
+
+
         self.newQueryButton.clicked.connect(self.analyseNewQuery)
-        self.newQueryButton.clicked.connect(lambda: self.generateQEP("new",pgsql_qep_output))
+        self.newQueryButton.clicked.connect(lambda: self.generateQEP("new",self.getNewQueryInput()))
+        self.showNewVisualPlanFullBtn.clicked.connect(lambda: self.showNewVisualPlanFullBtn.setEnabled(True))
 
     def onClickedResetButton(self):
         self.resetButton.clicked.connect(lambda: self.oldQueryButton.setEnabled(True))
@@ -573,8 +587,6 @@ class Ui_Form(object):
         self.oldGraphicsView.deleteLater()
         self.oldGraphicsView = QtWidgets.QGraphicsView(self.form)
         self.oldVisualLayout.insertWidget(1, self.oldGraphicsView)
-
-
         self.newGraphicsView.deleteLater()
         self.newGraphicsView = QtWidgets.QGraphicsView(self.form)
         self.newVisualLayout.insertWidget(1, self.newGraphicsView)
@@ -604,8 +616,36 @@ class Ui_Form(object):
     def analyseNewQuery(self):
         query = self.getNewQueryInput()
         if query.strip() != "":
-            self.showNewQEP(query.strip())
-            self.textToSpeech(self.newQEPOutput.toPlainText(), "newQuery")
+
+            # EXPLAIN FOR QEP
+            QEPtree1 = self.explainObj.build_QEP_tree(self.getOldQueryInput())
+            QEPtree2 = self.explainObj.build_QEP_tree(self.getNewQueryInput())
+            print(self.getOldQueryInput())
+            # Get explanation for specified query (q1 or q2) by passing in
+            # the root node of the respective QEP tree
+            # Returns List[str] of explanations
+            explanationQEP1 = self.explainObj.get_QEP_explanation(QEPtree1)
+            explanationQEP2 = self.explainObj.get_QEP_explanation(QEPtree2)
+            # Get the comparisons between 2 QEP
+            # by passing the 2 QEPtrees as params
+            # Returns List[str] of comparisons between the 2 QEPs
+            comparison = self.explainObj.get_QEP_comparison(QEPtree1, QEPtree2)
+
+            differenceExplanationInQEP = ["  Explanation QEP 1  "] + explanationQEP1 + ["  Explanation QEP 2  "] + explanationQEP2 + ["  Comparison  "] + comparison
+
+            concatDiff = ""
+            for diff in differenceExplanationInQEP:
+                concatDiff = concatDiff + diff + '\n\n'
+
+            self.showNewQEP(concatDiff)
+            self.textToSpeech(self.diffBetweenQEPInput.toPlainText(), "newQuery")
+
+            # differences = self.explainObj.compare_sql(self.getOldQueryInput(), self.getNewQueryInput())
+            # explaination = self.explainObj.explainSQL(differences)
+            # self.explainObj.printSQLexplain(differences, explaination)
+            #
+            # self.showOldQEP(differences)
+            # self.textToSpeech(self.diffBetweenQEPInput.toPlainText(), "newQuery")
 
             self.showNewVisualPlanFullBtn.setEnabled(True)
             self.stopNewButton.setEnabled(True)

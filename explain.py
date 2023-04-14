@@ -305,11 +305,11 @@ class QEP_Tree:
 
 
 class Explain:
-    def __init__(self, interface, cursorManager: CursorManager):
-        self.interface = interface
+    def __init__(self, cursorManager: CursorManager):
+        # self.interface = interface
         self.cursorManager = cursorManager
         self.cursor = self.cursorManager.get_cursor()
-        self.updateSchema()
+        # self.updateSchema()
 
     def updateSchema(self):
         try:
@@ -329,8 +329,9 @@ class Explain:
             print("Database schema as follows: ")
             for t, table in enumerate(schema):
                 print(t + 1, table, schema.get(table))
+            return schema
 
-            self.interface.setSchema(schema)
+            # self.interface.setSchema(schema)
         except Exception as e:
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
