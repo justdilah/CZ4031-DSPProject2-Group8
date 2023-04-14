@@ -552,6 +552,7 @@ class Ui_Form(object):
         self.showNewVisualPlanFullBtn.clicked.connect(lambda: self.showNewVisualPlanFullBtn.setEnabled(True))
         self.newQueryButton.clicked.connect(self.analyseNewQuery)
         self.newQueryButton.clicked.connect(lambda: self.generateQEP("new",pgsql_qep_output))
+
     def onClickedResetButton(self):
         self.resetButton.clicked.connect(lambda: self.oldQueryButton.setEnabled(True))
         self.resetButton.clicked.connect(lambda: self.oldQueryInput.setReadOnly(False))
@@ -593,8 +594,7 @@ class Ui_Form(object):
             self.textToSpeech(self.oldQEPOutput.toPlainText(), "oldQuery")
 
             self.showOldVisualPlanFullBtn.setEnabled(True)
-            self.stopOldButton.setEnabled(True)
-            self.playOldButton.setEnabled(True)
+
             self.disabledStateForOldQuery()
             self.newQueryButton.setEnabled(True)
             self.newQueryInput.setReadOnly(False)
@@ -610,6 +610,8 @@ class Ui_Form(object):
             self.showNewVisualPlanFullBtn.setEnabled(True)
             self.stopNewButton.setEnabled(True)
             self.playNewButton.setEnabled(True)
+            self.stopOldButton.setEnabled(True)
+            self.playOldButton.setEnabled(True)
         else:
             self.showError("Please input Query Q'")
 

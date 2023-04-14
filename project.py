@@ -39,6 +39,8 @@ def main():
     explain = Explain(ui, cursorManager)
 
 
+
+
     form.show()
     app.exec()
 
