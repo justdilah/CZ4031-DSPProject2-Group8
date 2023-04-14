@@ -82,6 +82,7 @@ class QEP_Tree:
         indent_size = 0
         operation = ""
         details = None
+        i = 0
         for row in plan:
             cur_row = row[0]
 
@@ -112,6 +113,7 @@ class QEP_Tree:
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = indent_size
+                    i+=1
                     continue
 
                 # node is on the same level
@@ -120,9 +122,30 @@ class QEP_Tree:
                     parent = cur_node.parent
                     node.parent = parent
                     parent.children.append(node)
+
+                # further down the tree there are child nodes
+                # so have to go back up the plan to find it's parent
+                elif self.prev_indent_size > indent_size:
+                    j = i
+                    while j > 0:
+                        prev_row = plan[j - 1][0]
+                        if "->" in prev_row:
+                            prev_match = re.match(r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", prev_row)
+                            prev_indent_size = len(prev_match.group(1))
+                            prev_operation = prev_match.group(2).replace("Parallel", "")
+                            if prev_indent_size == indent_size:
+                                print(prev_operation, operation, prev_indent_size, indent_size)
+                                p = self.findParent(self.root, prev_indent_size)
+                                print("pfound", p.operation, p.indent_size)
+                                if len(p.children) < 2:
+                                    p.children.append(node)
+                                    node.parent = p
+                                    break
+                        j-=1
                 else:
                     node.parent = cur_node
-                    cur_node.children.append(node)
+                    if len(cur_node.children) < 2:
+                        cur_node.children.append(node)
             # Row is an explanation row (without '->')
             # Attach the explanations to the explanation list in the node
             else:
@@ -132,6 +155,7 @@ class QEP_Tree:
                     explain_results = ""
 
                 if explain_results == None or explain_results == "":
+                    i+=1
                     continue
 
                 node.explanation.append(explain_results)
@@ -139,8 +163,18 @@ class QEP_Tree:
             # Update the current node pointer
             self.prev_indent_size = indent_size
             cur_node = node
+            i+=1
 
         return self.root
+    
+    def findParent(self, node: QEP_Node, indentSize):
+        if node == None: return
+
+        if indentSize == node.indent_size:
+            return node.parent
+        
+        for child in node.children:
+            return self.findParent(child, indentSize)
 
     """
     Transform the raw explanation from postgres
@@ -203,6 +237,10 @@ class QEP_Tree:
 
         for child in node.children:
             self.get_explanation(child, resultList)
+
+        print(" " * node.indent_size, "-> " + node.operation)
+        if node.explanation:
+            print(" " * (node.indent_size + 1), node.explanation)
 
         operation = node.operation
         explanation = (
@@ -491,3 +529,61 @@ class Explain:
                 c += 1
                 oldtype = ""
                 newtype = ""
+
+if __name__ == "__main__":
+    cm = CursorManager()
+    explain = Explain(cm)
+    q = '''
+select
+      o_year,
+      sum(case
+        when nation = 'BRAZIL' then volume
+        else 0
+      end) / sum(volume) as mkt_share
+    from
+      (
+        select
+          DATE_PART('YEAR',o_orderdate) as o_year,
+          l_extendedprice * (1 - l_discount) as volume,
+          n2.n_name as nation
+        from
+          part,
+          supplier,
+          lineitem,
+          orders,
+          customer,
+          nation n1,
+          nation n2,
+          region
+        where
+          p_partkey = l_partkey
+          and s_suppkey = l_suppkey
+          and l_orderkey = o_orderkey
+          and o_custkey = c_custkey
+          and c_nationkey = n1.n_nationkey
+          and n1.n_regionkey = r_regionkey
+          and r_name = 'AMERICA'
+          and s_nationkey = n2.n_nationkey
+          and o_orderdate between '1995-01-01' and '1996-12-31'
+          and p_type = 'ECONOMY ANODIZED STEEL'
+          and s_acctbal > 10
+          and l_extendedprice > 100
+      ) as all_nations
+    group by
+      o_year
+    order by
+      o_year;
+    '''
+    tree = explain.build_QEP_tree(q)
+    QEP_Tree().print_tree(tree)
+    print("-" * 40)
+
+    e = explain.get_QEP_explanation(tree)
+    print("-" * 40)
+    for r in e:
+        print(r)
+    print("-" * 40)
+
+    plan = cm.get_QEP("explain " + q)
+    for r in plan:
+        print(r)
