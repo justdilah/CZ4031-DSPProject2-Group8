@@ -6,6 +6,7 @@ import json
 import re
 import difflib
 import sqlparse
+import textwrap
 
 
 class CursorManager(object):
@@ -207,12 +208,45 @@ class Explain():
     #         keywords["WHERE"] = where_match.group(1)
         
     #     return keywords
+    
+    def stripString (str):
+        # Remove leading/trailing whitespace and split into lines
+        sql_lines = str.lower().strip().split('\n')
+        stripped_list = [s.strip() for s in sql_lines]
+
+        # print(stripped_list)
+        # Join lines back together with no separator
+        result = ' '.join(stripped_list)
             
+        keywords = ["from", "where","or","like","group by","order by"]
+        sections = []
+        start_index = 0
+        pre = ""
+
+        for keyword in keywords:
+            index = result.find(keyword)
+            if index != -1:
+                sections.append(pre + " " +result[start_index:index].strip())
+                # sections.append(keyword)
+                start_index = index + len(keyword)
+                pre = keyword
+
+        sections.append(pre + " " +result[start_index:].strip())
+        return sections
 
     def compare_sql(string1, string2):
         # Split the strings into lines
-        lines1 = string1.splitlines()
-        lines2 = string2.splitlines()
+        lines1 = Explain.stripString(string1)
+        lines2 = Explain.stripString(string2)
+        
+        # for i in lines1:
+        #     print("HERE: " + i)
+            
+        # for i in lines2:
+        #     print("HERE: " + i)
+        
+        # print(len(lines1))
+        # print(len(lines2))
         
         # Compare the lines using the Differ class
         differ = difflib.Differ()
@@ -238,9 +272,9 @@ class Explain():
                 temp.append(("SQL new added\n", text))
                 sign = "+"
             elif line.startswith("+") and pre.startswith("+"):
-                temp.append(("       ", text)) # SQL 2
+                temp.append(("", text)) # SQL 2
             elif line.startswith("-") and pre.startswith("-"):
-                temp.append(("       ", text)) # SQL 1 
+                temp.append(("", text)) # SQL 1 
             elif line.startswith("?") : 
                 continue
                         
@@ -253,9 +287,9 @@ class Explain():
     
     def explainSQL (diffArray):
         
-    # for i in differences:
-    #     for n, m in i:
-    #         print(f"{n} {m}")
+        # for i in diffArray:
+        #     for n, m in i:
+        #         print(f"{n} {m}")
         line1 = ""
         line2 = ""
         pretype = ""
@@ -340,56 +374,84 @@ if __name__ == "__main__":
     cursorManager = CursorManager()
     cursor = cursorManager.get_cursor()
     # sql = "explain select * from customer C, orders O where C.c_custkey = O.o_custkey and C.c_name like '%cheng'"
-    sql = '''explain 
-        select
-            ps_partkey,
-            sum(ps_supplycost * ps_availqty) as value
+    sql = '''select
+            supp_nation, cust_nation, l_year, sum(volume) as revenue
         from
-            partsupp,
-            supplier,
-            nation
+        (
+            select
+                n1.n_name as supp_nation,
+                n2.n_name as cust_nation,
+                DATE_PART('YEAR',l_shipdate) as l_year,
+                l_extendedprice * (1 - l_discount) as volume
+            from
+                supplier,
+                lineitem,
+                orders,
+                customer,
+                nation n1,
+                nation n2
+            where
+                s_suppkey = l_suppkey
+                and o_orderkey = l_orderkey
+                and c_custkey = o_custkey
+                and s_nationkey = n1.n_nationkey
+                and c_nationkey = n2.n_nationkey
+        ) as shipping
         where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey
-            and n_name = 'GERMANY'
-            and ps_supplycost > 20
-            and s_acctbal > 10
+            s_suppkey = l_suppkey
+            and o_orderkey = l_orderkey
+            and c_custkey = o_custkey
+            and s_nationkey = n1.n_nationkey
+            and c_nationkey = n2.n_nationkey
         group by
-            ps_partkey having
-                sum(ps_supplycost * ps_availqty) > 1
-        order by
-            value desc;'''
+            supp_nation,
+            cust_nation,
+            l_year;'''
             
-    sql2 = '''explain 
+    sql2 = '''select
+      supp_nation,
+      cust_nation,
+      l_year,
+      sum(volume) as revenue
+    from
+      (
         select
-            ps_partkey,
-            sum(ps_supplycost * ps_availqty) as value
+          n1.n_name as supp_nation,
+          n2.n_name as cust_nation,
+          DATE_PART('YEAR',l_shipdate) as l_year,
+          l_extendedprice * (1 - l_discount) as volume
         from
-            partsupp,
-            supplier,
-            nation
+          supplier,
+          lineitem,
+          orders,
+          customer,
+          nation n1,
+          nation n2
         where
-            ps_suppkey = s_suppkey
-            and s_nationkey = n_nationkey1
-            and n_name = 'GERMANY'
-            and ps_supplycost > 100
-            and s_acctbal > 10
-        group by
-            ps_partkey having
-                sum(ps_supplycost * ps_availqty) > (
-                select
-                    sum(ps_supplycost * ps_availqty) * 0.0001000000
-                from
-                    partsupport,
-                    supplierbyme,
-                    nation
-                where
-                    ps_suppkey = s_suppkey
-                    and s_nationkey = n_nationkey
-                    and n_name = 'GERMANY'
-                )
-        order by
-            value desc;'''
+          s_suppkey = l_suppkey
+          and o_orderkey = l_orderkey
+          and c_custkey = o_custkey
+          and s_nationkey = n1.n_nationkey
+          and c_nationkey = n2.n_nationkey
+          and (
+            (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+            or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+          )
+          and l_shipdate between '1995-01-01' and '1996-12-31'
+          and o_totalprice > 100
+          and c_acctbal > 10
+      ) as shipping
+    where
+        s_suppkey = l_suppkey
+        and c_nationkey = n2.n_nationkey
+    group by
+      supp_nation,
+      cust_nation,
+      l_year
+    order by
+      supp_nation,
+      cust_nation,
+      l_year;'''
     
     # plan = cursorManager.get_QEP(cursor, sql)
     # plan = cursorManager.get_QEP(cursor, r'''explain select
