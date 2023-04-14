@@ -441,13 +441,20 @@ class Ui_Form(object):
         dialog.setStyleSheet("QLabel{min-width: 300px;}");
 
         dialog.newGraphicsView = QtWidgets.QGraphicsView()
+
+        if dialog.newGraphicsView is not None:
+            dialog.newGraphicsView.deleteLater()
+            dialog.newGraphicsView = QtWidgets.QGraphicsView()
+
         if type == "old":
             file_path = os.path.join(os.getcwd(), "oldVisualPlan" + str(".png"))
             dialog.setWindowTitle("Visual Plan P")
 
             pixmap = QtGui.QPixmap(file_path)
             item = QtWidgets.QGraphicsPixmapItem(pixmap)
+            self.oldScene.clear()
             self.oldScene.addItem(item)
+            self.oldScene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
             dialog.newGraphicsView.setScene(self.oldScene)
 
         else:
@@ -455,7 +462,9 @@ class Ui_Form(object):
             dialog.setWindowTitle("Visual Plan P'")
             pixmap = QtGui.QPixmap(file_path)
             item = QtWidgets.QGraphicsPixmapItem(pixmap)
+            self.newScene.clear()
             self.newScene.addItem(item)
+            self.newScene.setSceneRect(0,0,pixmap.width(),pixmap.height())
             dialog.newGraphicsView.setScene(self.newScene)
 
         lay = QVBoxLayout(dialog)
