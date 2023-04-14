@@ -66,12 +66,14 @@ class QEP_Node:
         self.children = []
         self.explanation = []
 
+    def returnExplanation(self):
+        return self.explanation
+
 
 class QEP_Tree:
     def __init__(self):
         self.root = None
         self.prev_indent_size = 0
-
     """
     Builds the QEP tree and returns the root node
     """
@@ -316,6 +318,8 @@ class Explain:
         self.cursor = self.cursorManager.get_cursor()
         # self.updateSchema()
 
+    def rollback(self):
+        self.cursorManager.conn.rollback()
     def updateSchema(self):
         try:
             query = "SELECT table_name, column_name, data_type, character_maximum_length as length FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position"
@@ -348,6 +352,8 @@ class Explain:
     def get_visual_plan(self, node: QEP_Node) -> List[str]:
         return QEP_Tree().get_visual_plan(node, [])
 
+    def checkRootIsEmpty(self):
+        return QEP_Tree().isEmpty()
     """
     Builds the QEP tree by first getting the plan from postgres
     Then builds the tree using the QEP_Tree class
@@ -377,7 +383,7 @@ class Explain:
     def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
         return QEP_Tree().compareQEP(node1, node2)
 
-    def compare_sql(string1, string2):
+    def compare_sql(self,string1, string2):
         # Split the strings into lines
         lines1 = string1.splitlines()
         lines2 = string2.splitlines()
@@ -399,10 +405,10 @@ class Explain:
                 differences.append(temp)
                 temp = []
             if len(temp) == 0 and line.startswith("-"):
-                temp.append(("SQL old removed\n", text))
+                temp.append(("<b>SQL old removed</b><br><br>", text))
                 sign = "-"
             elif len(temp) == 0 and line.startswith("+"):
-                temp.append(("SQL new added\n", text))
+                temp.append(("<b>SQL new added</b><br><br>", text))
                 sign = "+"
             elif line.startswith("+") and pre.startswith("+"):
                 temp.append(("       ", text))  # SQL 2
@@ -418,7 +424,7 @@ class Explain:
 
         return differences
 
-    def explainSQL(diffArray):
+    def explainSQL(self,diffArray):
         line1 = ""
         line2 = ""
         pretype = ""
@@ -427,10 +433,10 @@ class Explain:
 
         for i in diffArray:
             for diff_type, line in i:
-                if diff_type == "SQL new added\n" or diff_type == "SQL old removed\n":
+                if diff_type == "<b>SQL new added</b><br><br>" or diff_type == "<b>SQL old removed</b><br><br>":
                     pretype = diff_type
 
-                if pretype == "SQL old removed\n":
+                if pretype == "<b>SQL old removed</b><br><br>":
                     if line1 and line2:
                         string1_words = re.split(r"[ _-]+", line1)
                         string2_words = re.split(r"[ _-]+", line2)
@@ -441,10 +447,10 @@ class Explain:
                         line1 = ""
                         line2 = ""
 
-                if line1 == "" or pretype == "SQL old removed\n":
+                if line1 == "" or pretype == "<b>SQL old removed</b><br><br>":
                     line1 += line
                     continue
-                elif line2 == "" or pretype == "SQL new added\n":
+                elif line2 == "" or pretype == "<b>SQL new added</b><br><br>":
                     line2 += line
                     continue
 
@@ -472,7 +478,7 @@ class Explain:
 
         return explaination
 
-    def printSQLexplain(differences, explain):
+    def printSQLexplain(self,differences, explain):
         oldtype = ""
         newtype = ""
         c = 0
@@ -491,3 +497,28 @@ class Explain:
                 c += 1
                 oldtype = ""
                 newtype = ""
+
+    def concatDifferencesExplainSQL(self,differences, explain):
+        concatString = '<p style="font-size: 18px">'
+        oldtype = ""
+        newtype = ""
+        c = 0
+
+        for i in differences:
+            for diff_type, line in i:
+
+                concatString = concatString + diff_type + line + "<br><br>"
+                print(f"{diff_type} {line}")
+                if diff_type == "<b>SQL old removed</b><br><br>":
+                    oldtype = diff_type
+                elif diff_type == "<b>SQL new added</b><br><br>":
+                    newtype = diff_type
+
+            if oldtype and newtype:
+                concatString = concatString + ("<br><b>Explaination :</b><br><br> " + explain[c] + "<br>===================")
+                # print("<br>Explaination : " + explain[c] + "<br>=========================")
+                c += 1
+                oldtype = ""
+                newtype = ""
+        concatString = concatString + "</p>"
+        return concatString
