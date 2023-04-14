@@ -491,39 +491,3 @@ class Explain:
                 c += 1
                 oldtype = ""
                 newtype = ""
-
-
-if __name__ == "__main__":
-    cm = CursorManager()
-    explain = Explain(cm)
-
-    q1 = """
-    select
-      sum(l_extendedprice * l_discount) as revenue
-    from
-      lineitem
-    where
-                l_extendedprice > 100;
-    """
-
-    q2 = """
-    select
-      sum(l_extendedprice * l_discount) as revenue
-    from
-      lineitem
-    where
-                l_extendedprice > 100 AND l_extendedprice < 200;
-    """
-    qep1 = explain.build_QEP_tree(q1)
-    qep2 = explain.build_QEP_tree(q2)
-
-    QEP_Tree().print_tree(qep1)
-    print()
-    QEP_Tree().print_tree(qep2)
-    print()
-
-    e1 = explain.get_QEP_explanation(qep1)
-    e2 = explain.get_QEP_explanation(qep2)
-    c = explain.get_QEP_comparison(qep1, qep2)
-    for l in c:
-        print(l)
