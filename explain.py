@@ -23,7 +23,7 @@ class CursorManager(object):
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user" : "postgres",
-                "pwd" : "root",
+                "pwd" : "admin",
                 "port" : "5432"
             }
         }
@@ -507,9 +507,9 @@ class Explain:
         if len(temp) != 0 :
             differences.append(temp)
             
-        if differences[-1][0][0] == "SQL old removed\n":
+        if differences[-1][0][0] == "### SQL old removed\n\n":
             temp = []
-            temp.append(("SQL new added\n", " "))
+            temp.append(("### SQL new added\n\n", " "))
             differences.append(temp)
             
         return differences
