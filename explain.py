@@ -23,7 +23,7 @@ class CursorManager(object):
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user" : "postgres",
-                "pwd" : "admin",
+                "pwd" : "root",
                 "port" : "5432"
             }
         }
