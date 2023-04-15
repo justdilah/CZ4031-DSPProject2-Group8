@@ -1,9 +1,0 @@
-{
-  "TPC-H": {
-    "host": "localhost",
-    "dbname": "TPC-H",
-    "user" : "postgres",
-    "pwd" : "root",
-    "port" : "5432"
-  }
-}

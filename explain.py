@@ -23,7 +23,7 @@ class CursorManager(object):
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user" : "postgres",
-                "pwd" : "Dsp123",
+                "pwd" : "root",
                 "port" : "5432"
             }
         }
@@ -487,10 +487,10 @@ class Explain:
                 differences.append(temp)
                 temp = []
             if len(temp) == 0 and line.startswith("-"):
-                temp.append(("<b>SQL old removed</b><br><br>", text))
+                temp.append(("### SQL old removed\n\n", text))
                 sign = "-"
             elif len(temp) == 0 and line.startswith("+"):
-                temp.append(("<b>SQL new added</b><br><br>", text))
+                temp.append(("### SQL new added\n\n", text))
                 sign = "+"
             elif line.startswith("+") and pre.startswith("+"):
                 temp.append(("", text)) # SQL 2
@@ -517,10 +517,10 @@ class Explain:
 
         for i in diffArray:
             for diff_type, line in i:
-                if diff_type == "<b>SQL new added</b><br><br>" or diff_type == "<b>SQL old removed</b><br><br>":
+                if diff_type == "### SQL new added\n\n" or diff_type == "### SQL old removed\n\n":
                     pretype = diff_type
 
-                if pretype == "<b>SQL old removed</b><br><br>":
+                if pretype == "### SQL old removed\n\n":
                     if line1 and line2:
                         string1_words = re.split(r"[ _-]+", line1)
                         string2_words = re.split(r"[ _-]+", line2)
@@ -531,10 +531,10 @@ class Explain:
                         line1 = ""
                         line2 = ""
 
-                if line1 == "" or pretype == "<b>SQL old removed</b><br><br>":
+                if line1 == "" or pretype == "### SQL old removed\n\n":
                     line1 += line
                     continue
-                elif line2 == "" or pretype == "<b>SQL new added</b><br><br>":
+                elif line2 == "" or pretype == "### SQL new added\n\n":
                     line2 += line
                     continue
 
@@ -571,9 +571,9 @@ class Explain:
             for diff_type, line in i:
                 print(f"{diff_type} {line}")
 
-                if diff_type == "SQL old removed\n":
+                if diff_type == "### SQL old removed\n\n":
                     oldtype = diff_type
-                elif diff_type == "SQL new added\n":
+                elif diff_type == "### SQL new added\n\n":
                     newtype = diff_type
 
             if oldtype and newtype:
@@ -583,7 +583,7 @@ class Explain:
                 newtype = ""
 
     def concatDifferencesExplainSQL(self,differences, explain):
-        concatString = '<p style="font-size: 18px">'
+        concatString = ''
         oldtype = ""
         newtype = ""
         c = 0
@@ -595,18 +595,17 @@ class Explain:
             for i in differences:
                 for diff_type, line in i:
 
-                    concatString = concatString + diff_type + line + "<br><br>"
-                    print(f"{diff_type} {line}")
-                    if diff_type == "<b>SQL old removed</b><br><br>":
+                    concatString = concatString + diff_type + line + "\n\n"
+                    # print(f"{diff_type} {line}")
+                    if diff_type == "### SQL old removed\n\n":
                         oldtype = diff_type
-                    elif diff_type == "<b>SQL new added</b><br><br>":
+                    elif diff_type == "### SQL new added\n\n":
                         newtype = diff_type
 
                 if oldtype and newtype:
-                    concatString = concatString + ("<br><b>Explanation :</b><br><br> " + explain[c] + "<br>===================")
-                    # print("<br>Explanation : " + explain[c] + "<br>=========================")
+                    concatString = concatString + ("\n### Explanation :\n\n " + explain[c] + "\n===================\n")
+                    # print("\nExplanation : " + explain[c] + "\n=========================")
                     c += 1
                     oldtype = ""
                     newtype = ""
-        concatString = concatString + "</p>"
         return concatString

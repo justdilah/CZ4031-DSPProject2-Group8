@@ -40,13 +40,13 @@ class Ui_Form(object):
         self.databaseSchema = QTreeWidget(Form)
         self.databaseSchema.setObjectName(u"databaseSchema")
         self.databaseSchema.setHeaderLabels(["Schema"])
-        self.databaseSchema.setStyleSheet("font: 8pt")
+        self.databaseSchema.setStyleSheet("font: 10pt")
 
         # ----------------------- Instructions ------------------------------------------------
         self.instructions = QtWidgets.QTextBrowser(Form)
         self.instructions.setObjectName("instructions")
         self.instructions.setReadOnly(True)
-        self.instructions.setFontPointSize(9)
+        self.instructions.setFontPointSize(12)
 
         instructionsString = (
             "1. Once the Query Q has been submitted, 'Submit Query' button will be DISABLED. Click on the Reset button to re-enable it.\n\n"
@@ -89,7 +89,7 @@ class Ui_Form(object):
         # self.oldQueryInput.setFixedHeight(400)
         self.oldQueryInput.setObjectName("oldQueryInput")
         self.oldQueryInput.setReadOnly(False)
-        self.oldQueryInput.setFontPointSize(9)
+        self.oldQueryInput.setFontPointSize(12)
         self.OldQueryLayout.addWidget(self.oldQueryInput, 2)
 
         # Old Query Button
@@ -108,9 +108,9 @@ class Ui_Form(object):
 
         # ======================================== Differences between 2 SQL Inputs ===========================
         # Display differences between the 2 SQL Queries
-        self.diffBetweenSQLInput = QtWidgets.QTextBrowser(Form)
-        self.diffBetweenSQLInput.setObjectName("diffBetweenSQLInput")
-        self.diffBetweenSQLInput.setFontPointSize(9)
+        self.diffBetweenSQLOuput = QtWidgets.QTextBrowser(Form)
+        self.diffBetweenSQLOuput.setObjectName("diffBetweenSQLOuput")
+        self.diffBetweenSQLOuput.setFontPointSize(12)
 
         self.oldAudiohorizontalLayout = QtWidgets.QHBoxLayout()
         self.oldAudiohorizontalLayout.setObjectName(u"horizontalLayout")
@@ -131,7 +131,7 @@ class Ui_Form(object):
         self.oldAudiohorizontalLayout.addWidget(self.stopOldButton)
         # Form.addWidget(self.horizontalLayout)
 
-        self.oldQEPLayout.addWidget(self.diffBetweenSQLInput)
+        self.oldQEPLayout.addWidget(self.diffBetweenSQLOuput)
         self.oldQEPLayout.addLayout(self.oldAudiohorizontalLayout)
 
         self.TopLayout.addLayout(self.oldQEPLayout)
@@ -195,9 +195,9 @@ class Ui_Form(object):
 
         # ======================================== Differences between 2 QEP plans ===========================
         # Display differences between 2 QEP plans
-        self.diffBetweenQEPInput = QtWidgets.QTextBrowser(Form)
-        self.diffBetweenQEPInput.setObjectName("diffBetweenQEPInput")
-        self.diffBetweenQEPInput.setFontPointSize(9)
+        self.diffBetweenQEPOutput = QtWidgets.QTextBrowser(Form)
+        self.diffBetweenQEPOutput.setObjectName("diffBetweenQEPOutput")
+        self.diffBetweenQEPOutput.setFontPointSize(12)
 
         self.newAudiohorizontalLayout = QtWidgets.QHBoxLayout()
         self.newAudiohorizontalLayout.setObjectName(u"newhorizontalLayout")
@@ -216,7 +216,7 @@ class Ui_Form(object):
         self.stopNewButton.setEnabled(False)
         self.newAudiohorizontalLayout.addWidget(self.stopNewButton)
 
-        self.newQEPLayout.addWidget(self.diffBetweenQEPInput)
+        self.newQEPLayout.addWidget(self.diffBetweenQEPOutput)
         self.newQEPLayout.addLayout(self.newAudiohorizontalLayout)
         self.bottomLayout.addLayout(self.newQEPLayout)
         self.newVisualLayout = QtWidgets.QVBoxLayout()
@@ -294,8 +294,8 @@ class Ui_Form(object):
         self.newQueryInput.clear()
         self.oldQueryInput.clear()
 
-        self.diffBetweenQEPInput.clear()
-        self.diffBetweenSQLInput.clear()
+        self.diffBetweenQEPOutput.clear()
+        self.diffBetweenSQLOuput.clear()
 
     def getOldQueryInput(self):
         return self.oldQueryInput.toPlainText()
@@ -303,9 +303,9 @@ class Ui_Form(object):
         return self.newQueryInput.toPlainText()
 
     def showDiffBetweenSQL(self, text):
-        self.diffBetweenSQLInput.setText(text)
+        self.diffBetweenSQLOuput.setText(text)
     def showDiffBetweenQEP(self, text):
-        self.diffBetweenQEPInput.setText(text)
+        self.diffBetweenQEPOutput.setText(text)
 
     # Displays error message
     def showError(self, errMessage, execption=None):
@@ -612,22 +612,33 @@ class Ui_Form(object):
             # Returns List[str] of comparisons between the 2 QEPs
             comparison = self.explainObj.get_QEP_comparison(QEPtree1, QEPtree2)
 
-            differenceExplanationInQEP = ["  <b>Explanation QEP 1</b>  "] + explanationQEP1 + ["  <b>Explanation QEP 2</b>  "] + explanationQEP2 + ["  <b>Comparison</b>  "] + comparison
+            differenceExplanationInQEP = ["### Explanation QEP 1  "] + explanationQEP1 + ["### Explanation QEP 2  "] + explanationQEP2 + ["### Comparison  "] + comparison
 
-            concatDiff = '<p style="font-size: 18px;">'
+            concatDiff = ""
             for diff in differenceExplanationInQEP:
-                concatDiff = concatDiff + diff + '</b><br><br>'
-            concatDiff = concatDiff + "</p>"
+                concatDiff = concatDiff + diff + '\n\n'
+
             self.showDiffBetweenQEP(concatDiff)
-            self.textToSpeech(self.diffBetweenQEPInput.toPlainText(), "newQuery")
+            textToSpeechQEP = self.diffBetweenQEPOutput.toPlainText().replace("#", "")
+            self.textToSpeech(textToSpeechQEP, "newQuery")
+
+            # print(self.getOldQueryInput())
+            # print(self.getNewQueryInput())
+
             differences = self.explainObj.compare_sql(self.getOldQueryInput(), self.getNewQueryInput())
             explaination = self.explainObj.explainSQL(differences)
 
             concatDiffSQL = self.explainObj.concatDifferencesExplainSQL(differences, explaination)
 
-            print(concatDiffSQL)
+            # concatDiffSQL = concatDiffSQL.replace("<","less than")
+            # concatDiffSQL = concatDiffSQL.replace("=", " equals")
+            # concatDiffSQL = concatDiffSQL.replace(">", "more than")
+
+
+            # print(concatDiffSQL)
             self.showDiffBetweenSQL(concatDiffSQL)
-            self.textToSpeech(self.diffBetweenSQLInput.toPlainText(), "oldQuery")
+            textToSpeechSQL = self.diffBetweenSQLOuput.toPlainText().replace("#","")
+            self.textToSpeech(textToSpeechSQL, "oldQuery")
 
             self.showNewVisualPlanFullBtn.setEnabled(True)
             self.stopNewButton.setEnabled(True)
