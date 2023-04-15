@@ -11,12 +11,22 @@ import difflib
 
 class CursorManager(object):
     def __init__(self):
-        self._CONFIG_PATH = "./config.json"
-        try:
-            with open(self._CONFIG_PATH, "r") as f:
-                config = json.load(f)
-        except FileNotFoundError as e:
-            raise e
+        # self._CONFIG_PATH = "./config.json"
+        # try:
+        #     with open(self._CONFIG_PATH, "r") as f:
+        #         config = json.load(f)
+        # except FileNotFoundError as e:
+        #     raise e
+
+        config = {
+            "TPC-H": {
+                "host": "localhost",
+                "dbname": "TPC-H",
+                "user" : "postgres",
+                "pwd" : "Dsp123",
+                "port" : "5432"
+            }
+        }
 
         self._config = config["TPC-H"]
         self.conn = None
@@ -454,7 +464,7 @@ class Explain:
         sections.append(pre + " " +result[start_index:].strip())
         return sections 
 
-    def compare_sql(string1, string2):
+    def compare_sql(self, string1, string2):
         # Split the strings into lines
         lines1 = Explain.stripString(string1)
         lines2 = Explain.stripString(string2)
@@ -567,7 +577,7 @@ class Explain:
                     newtype = diff_type
 
             if oldtype and newtype:
-                print("\nExplaination : " + explain[c] + "\n=========================")
+                print("\nExplanation : " + explain[c] + "\n=========================")
                 c += 1
                 oldtype = ""
                 newtype = ""
@@ -593,8 +603,8 @@ class Explain:
                         newtype = diff_type
 
                 if oldtype and newtype:
-                    concatString = concatString + ("<br><b>Explaination :</b><br><br> " + explain[c] + "<br>===================")
-                    # print("<br>Explaination : " + explain[c] + "<br>=========================")
+                    concatString = concatString + ("<br><b>Explanation :</b><br><br> " + explain[c] + "<br>===================")
+                    # print("<br>Explanation : " + explain[c] + "<br>=========================")
                     c += 1
                     oldtype = ""
                     newtype = ""
