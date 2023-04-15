@@ -623,11 +623,15 @@ class Ui_Form(object):
 
             # print(self.getOldQueryInput())
             # print(self.getNewQueryInput())
+            
+            if self.getOldQueryInput() == self.getNewQueryInput():
+                concatDiffSQL = "Both SQL query are the same."
+            else:
 
-            differences = self.explainObj.compare_sql(self.getOldQueryInput(), self.getNewQueryInput())
-            explaination = self.explainObj.explainSQL(differences)
+                differences = self.explainObj.compare_sql(self.getOldQueryInput(), self.getNewQueryInput())
+                explaination = self.explainObj.explainSQL(differences)
 
-            concatDiffSQL = self.explainObj.concatDifferencesExplainSQL(differences, explaination)
+                concatDiffSQL = self.explainObj.concatDifferencesExplainSQL(differences, explaination)
 
             # concatDiffSQL = concatDiffSQL.replace("<","less than")
             # concatDiffSQL = concatDiffSQL.replace("=", " equals")
