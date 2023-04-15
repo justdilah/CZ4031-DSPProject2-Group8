@@ -595,11 +595,10 @@ class Ui_Form(object):
                 self.reset()
                 return
 
-            # POP UP TO INFORM USER THAT IT WILL TAKE A BIT OF TIME TO GENERATE QEP
-            self.generatingPopUp()
-
             # GENERATE QEP PLAN FOR NEW QUERY INPUT
             self.generateQEP("new", self.getNewQueryInput())
+            # POP UP TO INFORM USER THAT IT WILL TAKE A BIT OF TIME TO GENERATE QEP
+            self.generatingPopUp()
 
             QEPtree2 = self.explainObj.build_QEP_tree(self.getNewQueryInput())
             # Get explanation for specified query (q1 or q2) by passing in

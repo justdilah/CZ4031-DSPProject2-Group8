@@ -11,19 +11,12 @@ import difflib
 
 class CursorManager(object):
     def __init__(self):
-        # self._CONFIG_PATH = "./config.json"
-        # try:
-        #     with open(self._CONFIG_PATH, "r") as f:
-        #         config = json.load(f)
-        # except FileNotFoundError as e:
-        #     raise e
-
         config = {
             "TPC-H": {
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user" : "postgres",
-                "pwd" : "root",
+                "pwd" : "Dsp123",
                 "port" : "5432"
             }
         }
@@ -514,13 +507,13 @@ class Explain:
             
         return differences
     
-    def explainSQL (diffArray):
+    def explainSQL (self, diffArray):
         
         line1 = ""
         line2 = ""
         pretype = ""
         change = []
-        explaination = []
+        explanation = []
         
         for i in diffArray:
             for diff_type, line in i:
@@ -558,25 +551,24 @@ class Explain:
                         change.append([string1_words[i],string2_words[i]])
             else :
                 change.append([' '.join(string1_words),' '.join(string2_words)])
-                          
-                    
+
         for i in change:
             if i[1] == " ":
-                explaination.append("The old query is removed")
+                explanation.append("The old query is removed")
             elif i[0].isnumeric() and i[1].isnumeric():  
-                explaination.append("There is a change in value")
+                explanation.append("There is a change in value")
             elif i[0].isnumeric() and (i[1].isalnum() or i[1].isalpha()):
-                explaination.append("There is a change from a value to a variable")
+                explanation.append("There is a change from a value to a variable")
             elif i[1].isnumeric() and (i[0].isalnum() or i[0].isalpha()):  
-                explaination.append("There is a change from a variable to a value")
+                explanation.append("There is a change from a variable to a value")
             elif (i[0].isalnum() or i[0].isalpha()) and (i[1].isalnum() or i[1].isalpha()):
-                explaination.append("There is a change in variable")
-            else :
-                explaination.append("The query here has been changed")
+                explanation.append("There is a change in variable")
+            else:
+                explanation.append("The query here has been changed")
                 
-        return explaination
+        return explanation
     
-    def printSQLexplain (differences , explain):
+    def printSQLexplain (differences, explain):
         oldtype = ""
         newtype = ""
         c = 0
@@ -618,7 +610,6 @@ class Explain:
 
                 if oldtype and newtype:
                     concatString = concatString + ("\n### Explanation :\n\n " + explain[c] + "\n===================\n")
-                    # print("\nExplanation : " + explain[c] + "\n=========================")
                     c += 1
                     oldtype = ""
                     newtype = ""
