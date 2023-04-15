@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import *
 from PyQt5 import QtCore
 from gtts import gTTS
 import os
+import json
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -334,81 +335,96 @@ class Ui_Form(object):
         for vs1Item in visualPlan1:
             qep_output = qep_output + vs1Item + '\n'
 
-        # take only text which has "->" which indicates the nodes except "-> Ending Steps"
-        strArray = qep_output.strip().split("\n")
-        strArray = [x for x in strArray if "[" not in x]
-        qep_output = [x for x in strArray if "Ending" not in x]
+        # Split the string into lines
+        lines = qep_output.strip().split("\n")
 
-        # Initialize an empty dictionary to hold the output
-        output_dict = {}
-        #
-        # # Iterate over each element in the input list
-        for i, item in enumerate(qep_output):
+        # Initialize an empty list to hold the tree nodes
+        nodes = []
 
-            # Count the number of indentations
-            num_indentations = len(item) - len(item.lstrip(' '))
+        # Initialize a stack to keep track of parent nodes
+        stack = []
 
-            # Get the label for the current item
-            label = item.strip().lstrip('-> ')
+        # Initialize a list with the nodes added to check for duplication
+        checker = []
 
-            # Initialize an empty list to hold the children of the current item
-            children = []
+        # calculate the number of spaces in a string
+        def count_spaces(s):
+            return len(s) - len(s.lstrip())
 
-            for j in range(i + 1, len(qep_output)):
-                next_indentations = len(qep_output[j]) - len(qep_output[j].lstrip(' '))
-                # print(qep_output[j] + " - " + str(next_indentations) + " " + str(num_indentations))
-                if next_indentations > num_indentations:
-                    if children:
-                        prev_indentations = len(qep_output[j - 1]) - len(qep_output[j - 1].lstrip(' '))
-                        if prev_indentations == next_indentations:
-                            children.append(qep_output[j].strip().lstrip('-> '))
-                        else:
-                            break
-                    else:
-                        children.append(qep_output[j].strip().lstrip('-> '))
-                else:
-                    break
-            output_dict[label] = children
+        for i, line in enumerate(lines):
+            # Calculate the number of spaces in the line
+            spaces = count_spaces(line)
 
+            # Remove the "->" prefix and trim whitespace
+            value = line.replace("->", "").strip()
 
-        # Create a new graph
-        first_value = output_dict[list(output_dict.keys())[0]]
+            # add a ROOT keyword for identification of first node in graph
+            if i == 0:
+                value = 'ROOT: ' + value
 
-        new_key = 'ROOT: ' + list(output_dict.keys())[0]
-        new_dict = {new_key: first_value}
+            # if there's a duplicate, add a * to it and check checker again and repeat
+            if value in checker:
+                modified_value = value + " *"
 
-        del output_dict[list(output_dict.keys())[0]]
+                while modified_value in checker:
+                    modified_value = modified_value + "*"
 
-        new_dict.update(output_dict)
+                checker.append(modified_value)
+            else:
+                checker.append(value)
+                modified_value = value
 
-        output_dict = new_dict
+            # Create a new node
+            node = {"value": modified_value}
 
-        G = nx.DiGraph()
-        # # Add nodes to the graph in left deep order
-        def add_node_and_children(node):
-            if node in G:
-                return
-            G.add_node(node)
-            for child in output_dict[node]:
-                # if 'Workers Planned' not in child:
-                add_node_and_children(child)
-                G.add_edge(node, child)
+            # If the stack is not empty and the current node has less spaces than the top node on the stack, pop the stack until the current node can be added as a child of the top node
+            while len(stack) > 0 and spaces <= stack[-1]["spaces"]:
+                stack.pop()
 
-        add_node_and_children(list(output_dict.keys())[0])
+            # If the stack is not empty, the top node on the stack is the parent of the current node
+            if len(stack) > 0:
+                parent = stack[-1]["node"]
+                parent.setdefault("children", []).append(node)
+            # Otherwise, the current node is a root node
+            else:
+                nodes.append(node)
 
-        # Set layout
-        if G.number_of_nodes() <= 5:
-            pos = nx.kamada_kawai_layout(G)
+            # Add the current node to the stack
+            stack.append({"spaces": spaces, "node": node})
+
+        # Convert the tree to JSON
+        json_output = json.dumps(nodes, indent=2)
+
+        # Load the JSON as a Python object
+        graph = json.loads(json_output)
+
+        # Create graph
+        nx_graph = nx.DiGraph()
+
+        # Add nodes and edges to the graph
+        def add_nodes_and_edges(node, parent=None):
+            value = node["value"]
+            nx_graph.add_node(value)
+            if parent is not None:
+                nx_graph.add_edge(parent, value)
+            if "children" in node:
+                for child in node["children"]:
+                    add_nodes_and_edges(child, value)
+
+        # Call the function to add nodes and edges to the graph
+        for node in graph:
+            add_nodes_and_edges(node)
+
+        if nx_graph.number_of_nodes() <= 5:
+            pos = nx.kamada_kawai_layout(nx_graph)
             fig, ax = plt.subplots(figsize=(25, 5))
         else:
-            pos = nx.circular_layout(G)
-            fig, ax = plt.subplots(figsize=(25, 10))
-
+            pos = nx.circular_layout(nx_graph, scale=100)
+            fig, ax = plt.subplots(figsize=(50, 10))
 
         # Draw the graph
-        nx.draw(G, pos=pos, with_labels=True, node_shape="s",  node_color="none", bbox=dict(facecolor="#FFBF00", edgecolor='black', boxstyle='round,pad=1'))
-
-        plt.margins(x=0.4, y=0.4)
+        nx.draw(nx_graph, pos=pos, with_labels=True, node_shape="s", node_color="none",
+                bbox=dict(facecolor="#FFBF00", edgecolor='black', boxstyle='round,pad=1'))
 
         if type == "old":
             file_path = os.path.join(os.getcwd(), "oldVisualPlan" + str(".png"))
@@ -439,6 +455,7 @@ class Ui_Form(object):
     def showMaxImage(self, type):
         dialog = QDialog()
         dialog.setStyleSheet("QLabel{min-width: 300px;}");
+        dialog.showMaximized()
 
         dialog.newGraphicsView = QtWidgets.QGraphicsView()
 
