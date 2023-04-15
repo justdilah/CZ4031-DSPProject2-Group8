@@ -75,6 +75,7 @@ class QEP_Tree:
     def __init__(self):
         self.root = None
         self.prev_indent_size = 0
+
     """
     Builds the QEP tree and returns the root node
     """
@@ -129,21 +130,11 @@ class QEP_Tree:
                 # further down the tree there are child nodes
                 # so have to go back up the plan to find it's parent
                 elif self.prev_indent_size > indent_size:
-                    j = i
-                    while j > 0:
-                        prev_row = plan[j - 1][0]
-                        if "->" in prev_row:
-                            prev_match = re.match(
-                                r"(\s*->)?\s*(\w.*)\s+\((.*)\)$", prev_row
-                            )
-                            prev_indent_size = len(prev_match.group(1))
-                            if prev_indent_size == indent_size:
-                                p = self.findParent(self.root, prev_indent_size)
-                                if len(p.children) < 2:
-                                    p.children.append(node)
-                                    node.parent = p
-                                    break
-                        j -= 1
+                    p = self.findParent(self.root, indent_size)
+                    if p:
+                        # if len(p.children) < 2:
+                        p.children.append(node)
+                        node.parent = p
                 else:
                     node.parent = cur_node
                     if len(cur_node.children) < 2:
@@ -170,14 +161,18 @@ class QEP_Tree:
         return self.root
 
     def findParent(self, node: QEP_Node, indentSize):
-        if node == None:
-            return
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            if n.indent_size == indentSize:
+                return n.parent
+            if len(n.children) == 2:
+                stack.append(n.children[0])
+                stack.append(n.children[1])
+            if len(n.children) == 1:
+                stack.append(n.children[0])
 
-        if indentSize == node.indent_size:
-            return node.parent
-
-        for child in node.children:
-            return self.findParent(child, indentSize)
+        return None
 
     """
     Transform the raw explanation from postgres
@@ -367,6 +362,7 @@ class Explain:
     # ROLLBACKS TRANSACTION IF THERE ARE ISSUES
     def rollback(self):
         self.cursorManager.conn.rollback()
+
     def updateSchema(self):
         try:
             query = "SELECT table_name, column_name, data_type, character_maximum_length as length FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name, ordinal_position"
@@ -401,6 +397,7 @@ class Explain:
 
     def checkRootIsEmpty(self):
         return QEP_Tree().isEmpty()
+
     """
     Builds the QEP tree by first getting the plan from postgres
     Then builds the tree using the QEP_Tree class
@@ -430,7 +427,7 @@ class Explain:
     def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
         return QEP_Tree().compareQEP(node1, node2)
 
-    def compare_sql(self,string1, string2):
+    def compare_sql(self, string1, string2):
         # Split the strings into lines
         lines1 = string1.splitlines()
         lines2 = string2.splitlines()
@@ -471,7 +468,7 @@ class Explain:
 
         return differences
 
-    def explainSQL(self,diffArray):
+    def explainSQL(self, diffArray):
         line1 = ""
         line2 = ""
         pretype = ""
@@ -480,7 +477,10 @@ class Explain:
 
         for i in diffArray:
             for diff_type, line in i:
-                if diff_type == "<b>SQL new added</b><br><br>" or diff_type == "<b>SQL old removed</b><br><br>":
+                if (
+                    diff_type == "<b>SQL new added</b><br><br>"
+                    or diff_type == "<b>SQL old removed</b><br><br>"
+                ):
                     pretype = diff_type
 
                 if pretype == "<b>SQL old removed</b><br><br>":
@@ -525,7 +525,7 @@ class Explain:
 
         return explaination
 
-    def printSQLexplain(self,differences, explain):
+    def printSQLexplain(self, differences, explain):
         oldtype = ""
         newtype = ""
         c = 0
@@ -545,19 +545,20 @@ class Explain:
                 oldtype = ""
                 newtype = ""
 
-    def concatDifferencesExplainSQL(self,differences, explain):
+    def concatDifferencesExplainSQL(self, differences, explain):
         concatString = '<p style="font-size: 18px">'
         oldtype = ""
         newtype = ""
         c = 0
 
         if len(differences) == 0 and len(explain) == 0:
-            concatString = concatString + ("There are no differences between the 2 SQL queries")
+            concatString = concatString + (
+                "There are no differences between the 2 SQL queries"
+            )
 
         else:
             for i in differences:
                 for diff_type, line in i:
-
                     concatString = concatString + diff_type + line + "<br><br>"
                     print(f"{diff_type} {line}")
                     if diff_type == "<b>SQL old removed</b><br><br>":
@@ -566,7 +567,11 @@ class Explain:
                         newtype = diff_type
 
                 if oldtype and newtype:
-                    concatString = concatString + ("<br><b>Explaination :</b><br><br> " + explain[c] + "<br>===================")
+                    concatString = concatString + (
+                        "<br><b>Explaination :</b><br><br> "
+                        + explain[c]
+                        + "<br>==================="
+                    )
                     # print("<br>Explaination : " + explain[c] + "<br>=========================")
                     c += 1
                     oldtype = ""
