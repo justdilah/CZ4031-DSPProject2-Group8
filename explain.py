@@ -440,6 +440,10 @@ class Explain:
         return QEP_Tree().compareQEP(node1, node2)
         
     def stripString (str):
+        # remove ; at the end 
+        if str[-1] == ';':
+            str = str[:-1]
+        
         # Remove leading/trailing whitespace and split into lines
         sql_lines = str.lower().strip().split('\n')
         stripped_list = [s.strip() for s in sql_lines]
@@ -448,7 +452,7 @@ class Explain:
         # Join lines back together with no separator
         result = ' '.join(stripped_list)
             
-        keywords = ["from", "where","or","like","group by","order by"]
+        keywords = ["from", "where","like","group by","order by"]
         sections = []
         start_index = 0
         pre = ""
@@ -462,21 +466,20 @@ class Explain:
                 pre = keyword
 
         sections.append(pre + " " +result[start_index:].strip())
-        return sections 
+        return sections
 
     def compare_sql(self, string1, string2):
         # Split the strings into lines
         lines1 = Explain.stripString(string1)
         lines2 = Explain.stripString(string2)
-
-
+        
         # Compare the lines using the Differ class
         differ = difflib.Differ()
         diff = list(differ.compare(lines1, lines2))
-
+        
         # Store the differences in a list
         differences = []
-        temp = []
+        temp=[]
         sign = ""
         pre = ""
         for line in diff:
@@ -498,23 +501,27 @@ class Explain:
                 temp.append(("", text)) # SQL 1 
             elif line.startswith("?") : 
                 continue
-
+                        
             pre = line
-
-        if len(temp) != 0:
+                       
+        if len(temp) != 0 :
             differences.append(temp)
-
+            
+        if differences[-1][0][0] == "SQL old removed\n":
+            temp = []
+            temp.append(("SQL new added\n", " "))
+            differences.append(temp)
+            
         return differences
-
-
-
-    def explainSQL(self,diffArray):
+    
+    def explainSQL (diffArray):
+        
         line1 = ""
         line2 = ""
         pretype = ""
         change = []
         explaination = []
-
+        
         for i in diffArray:
             for diff_type, line in i:
                 if diff_type == "### SQL new added\n\n" or diff_type == "### SQL old removed\n\n":
@@ -522,12 +529,15 @@ class Explain:
 
                 if pretype == "### SQL old removed\n\n":
                     if line1 and line2:
-                        string1_words = re.split(r"[ _-]+", line1)
-                        string2_words = re.split(r"[ _-]+", line2)
-
-                        for i in range(min(len(string1_words), len(string2_words))):
-                            if string1_words[i] != string2_words[i]:
-                                change.append([string1_words[i], string2_words[i]])
+                        string1_words = re.split(r'[ _-]+', line1)
+                        string2_words = re.split(r'[ _-]+', line2)
+                            
+                        if len(string1_words) == len(string2_words):
+                            for i in range(min(len(string1_words),len(string2_words))):
+                                if string1_words[i] != string2_words[i]:
+                                    change.append([string1_words[i],string2_words[i]])
+                        else :
+                            change.append([' '.join(string1_words),' '.join(string2_words)])
                         line1 = ""
                         line2 = ""
 
@@ -537,36 +547,40 @@ class Explain:
                 elif line2 == "" or pretype == "### SQL new added\n\n":
                     line2 += line
                     continue
-
+                
         if line1 and line2:
-            string1_words = re.split(r"[ _-]+", line1)
-            string2_words = re.split(r"[ _-]+", line2)
-
-            for i in range(min(len(string1_words), len(string2_words))):
-                if string1_words[i] != string2_words[i]:
-                    change.append([string1_words[i], string2_words[i]])
-
+            string1_words = re.split(r'[ _-]+', line1)
+            string2_words = re.split(r'[ _-]+', line2)
+                
+            if len(string1_words) == len(string2_words):
+                for i in range(min(len(string1_words),len(string2_words))):
+                    if string1_words[i] != string2_words[i]:
+                        change.append([string1_words[i],string2_words[i]])
+            else :
+                change.append([' '.join(string1_words),' '.join(string2_words)])
+                          
+                    
         for i in change:
-            if i[0].isnumeric() and i[1].isnumeric():
+            if i[1] == " ":
+                explaination.append("The old query is removed")
+            elif i[0].isnumeric() and i[1].isnumeric():  
                 explaination.append("There is a change in value")
             elif i[0].isnumeric() and (i[1].isalnum() or i[1].isalpha()):
                 explaination.append("There is a change from a value to a variable")
-            elif i[1].isnumeric() and (i[0].isalnum() or i[0].isalpha()):
+            elif i[1].isnumeric() and (i[0].isalnum() or i[0].isalpha()):  
                 explaination.append("There is a change from a variable to a value")
-            elif (i[0].isalnum() or i[0].isalpha()) and (
-                i[1].isalnum() or i[1].isalpha()
-            ):
+            elif (i[0].isalnum() or i[0].isalpha()) and (i[1].isalnum() or i[1].isalpha()):
                 explaination.append("There is a change in variable")
-            else:
+            else :
                 explaination.append("The query here has been changed")
-
+                
         return explaination
-
-    def printSQLexplain(self,differences, explain):
+    
+    def printSQLexplain (differences , explain):
         oldtype = ""
         newtype = ""
         c = 0
-
+        
         for i in differences:
             for diff_type, line in i:
                 print(f"{diff_type} {line}")
@@ -575,13 +589,13 @@ class Explain:
                     oldtype = diff_type
                 elif diff_type == "### SQL new added\n\n":
                     newtype = diff_type
-
+                    
             if oldtype and newtype:
                 print("\nExplanation : " + explain[c] + "\n=========================")
                 c += 1
                 oldtype = ""
                 newtype = ""
-
+                
     def concatDifferencesExplainSQL(self,differences, explain):
         concatString = ''
         oldtype = ""
