@@ -13,16 +13,14 @@ import difflib
 class CursorManager(object):
     def __init__(self):
         config = {
-            "TPC-H": {
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user": "postgres",
                 "pwd": "root",
                 "port": "5432",
-            }
         }
 
-        self._config = config["TPC-H"]
+        self._config = config
         self.conn = None
         self.cursor = None
 
