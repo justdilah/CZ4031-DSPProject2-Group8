@@ -91,7 +91,7 @@ class Ui_Form(object):
         self.oldQueryInput.setReadOnly(False)
         self.oldQueryInput.setFontPointSize(12)
         self.OldQueryLayout.addWidget(self.oldQueryInput, 2)
-        
+
 
         # Old Query Button
         self.oldQueryButton = QtWidgets.QPushButton(Form)
