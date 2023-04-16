@@ -17,7 +17,7 @@ class CursorManager(object):
                 "host": "localhost",
                 "dbname": "TPC-H",
                 "user": "postgres",
-                "pwd": "Dsp123",
+                "pwd": "root",
                 "port": "5432",
             }
         }
