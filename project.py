@@ -10,11 +10,16 @@ def main():
     apply_stylesheet(app, theme='dark_amber.xml')
 
     form = QtWidgets.QWidget()
-    ui = interface.Ui_Form()
-    ui.setupUi(form)
+
 
     cursorManager = CursorManager()
-    explain = Explain(ui, cursorManager)
+    explain = Explain(cursorManager)
+
+    ui = interface.Ui_Form()
+    ui.setupUi(form, explain)
+
+    # SET DATABASE SCHEMAs
+    ui.setSchema()
 
     form.show()
     app.exec()

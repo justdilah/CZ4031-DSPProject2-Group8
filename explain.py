@@ -12,12 +12,15 @@ import difflib
 
 class CursorManager(object):
     def __init__(self):
-        self._CONFIG_PATH = "./config.json"
-        try:
-            with open(self._CONFIG_PATH, "r") as f:
-                config = json.load(f)
-        except FileNotFoundError as e:
-            raise e
+        config = {
+            "TPC-H": {
+                "host": "localhost",
+                "dbname": "TPC-H",
+                "user": "postgres",
+                "pwd": "Dsp123",
+                "port": "5432",
+            }
+        }
 
         self._config = config["TPC-H"]
         self.conn = None
@@ -65,6 +68,10 @@ class QEP_Node:
         self.parent = None
         self.children = []
         self.explanation = []
+        self.step = None
+
+    def returnExplanation(self):
+        return self.explanation
 
 
 class QEP_Tree:
@@ -82,6 +89,7 @@ class QEP_Tree:
         indent_size = 0
         operation = ""
         details = None
+        i = 0
         for row in plan:
             cur_row = row[0]
 
@@ -112,6 +120,7 @@ class QEP_Tree:
                     self.root.parent = self.root
                     cur_node = self.root
                     self.prev_indent_size = indent_size
+                    i += 1
                     continue
 
                 # node is on the same level
@@ -120,9 +129,19 @@ class QEP_Tree:
                     parent = cur_node.parent
                     node.parent = parent
                     parent.children.append(node)
+
+                # further down the tree there are child nodes
+                # so have to go back up the plan to find it's parent
+                elif self.prev_indent_size > indent_size:
+                    p = self.findParent(self.root, indent_size)
+                    if p:
+                        # if len(p.children) < 2:
+                        p.children.append(node)
+                        node.parent = p
                 else:
                     node.parent = cur_node
-                    cur_node.children.append(node)
+                    if len(cur_node.children) < 2:
+                        cur_node.children.append(node)
             # Row is an explanation row (without '->')
             # Attach the explanations to the explanation list in the node
             else:
@@ -132,6 +151,7 @@ class QEP_Tree:
                     explain_results = ""
 
                 if explain_results == None or explain_results == "":
+                    i += 1
                     continue
 
                 node.explanation.append(explain_results)
@@ -139,8 +159,23 @@ class QEP_Tree:
             # Update the current node pointer
             self.prev_indent_size = indent_size
             cur_node = node
+            i += 1
 
         return self.root
+
+    def findParent(self, node: QEP_Node, indentSize):
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            if n.indent_size == indentSize:
+                return n.parent
+            if len(n.children) == 2:
+                stack.append(n.children[0])
+                stack.append(n.children[1])
+            if len(n.children) == 1:
+                stack.append(n.children[0])
+
+        return None
 
     """
     Transform the raw explanation from postgres
@@ -197,7 +232,7 @@ class QEP_Tree:
     Returns a list of explanations of each step
     """
 
-    def get_explanation(self, node: QEP_Node, resultList) -> List[str]:
+    def get_explanation(self, node: QEP_Node, resultList: List[str]) -> List[str]:
         if node == None:
             return []
 
@@ -211,10 +246,21 @@ class QEP_Tree:
             else ""
         )
 
-        if explanation == "":
-            result = f"Step {len(resultList) + 1}: Perform {operation}"
+        step = len(resultList) + 1
+        if explanation == "" and (
+            "join" not in operation.lower()
+            and "hash" not in operation.lower()
+            and "nested loop" not in operation.lower()
+        ):
+            result = f"Step {step}: Perform {operation}"
+        elif "join" in operation.lower() or "nested loop" in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step} and {node.children[1].step}"
+        elif "hash" in operation.lower() and "join" not in operation.lower():
+            result = f"Step {step}: Perform {operation} on the intermediate results of step {node.children[0].step}"
         else:
-            result = f"Step {len(resultList) + 1}: Perform {operation} with {self.joinExplanationList(explanation)}"
+            result = f"Step {step}: Perform {operation} with {self.joinExplanationList(explanation)}"
+
+        node.step = step
 
         resultList.append(result)
 
@@ -256,7 +302,9 @@ class QEP_Tree:
                 else:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1} with {self.joinExplanationList(explanationQ1)}."
             elif operationQ1 == operationQ2 and explanationQ1 != explanationQ2:
-                if not explanationQ1:
+                if explanationQ1 and explanationQ2:
+                    compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q1 and Q2 have different conditions on the operations with Q1 to {self.joinExplanationList(explanationQ1)} and Q2 to {self.joinExplanationList(explanationQ2)}."
+                elif explanationQ1 and not explanationQ2:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q2 has an additional condition to {self.joinExplanationList(explanationQ2)} while Q1 is just performing a basic {operationQ1}."
                 else:
                     compareExplanation = f"Step {step}: Both queries perform the same operations at this step executing a {operationQ1}. However, Q1 has an additional condition to {self.joinExplanationList(explanationQ1)} while Q2 is just performing a basic {operationQ2}."
@@ -267,15 +315,18 @@ class QEP_Tree:
                     compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} with {self.joinExplanationList(explanationQ1)} and Q2 executing a {operationQ2}."
                 elif not explanationQ1 and explanationQ2:
                     compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} and Q2 executing a {operationQ2} with {self.joinExplanationList(explanationQ2)}."
+                else:
+                    compareExplanation = f"Step {step}: Both queries are performing different operations at this step, with Q1 executing a {operationQ1} and Q2 executing a {operationQ2}."
 
             compareList.append(compareExplanation)
+            compareExplanation = ""
             q1Pointer += 1
             q2Pointer += 1
 
         line = (
-            "Additional steps taken for Q1"
+            "Q1 has additional steps taken due to the change in query.\nAdditional steps taken by Q1:"
             if q1Pointer < len(q1Queue)
-            else "Additional steps taken for Q2"
+            else "Q2 has additional steps taken due to the change in query.\nAdditional steps taken by Q2:"
         )
         compareList.append(line)
 
@@ -305,11 +356,15 @@ class QEP_Tree:
 
 
 class Explain:
-    def __init__(self, interface, cursorManager: CursorManager):
-        self.interface = interface
+    def __init__(self, cursorManager: CursorManager):
+        # self.interface = interface
         self.cursorManager = cursorManager
         self.cursor = self.cursorManager.get_cursor()
-        self.updateSchema()
+        # self.updateSchema()
+
+    # ROLLBACKS TRANSACTION IF THERE ARE ISSUES
+    def rollback(self):
+        self.cursorManager.conn.rollback()
 
     def updateSchema(self):
         try:
@@ -329,8 +384,9 @@ class Explain:
             print("Database schema as follows: ")
             for t, table in enumerate(schema):
                 print(t + 1, table, schema.get(table))
+            return schema
 
-            self.interface.setSchema(schema)
+            # self.interface.setSchema(schema)
         except Exception as e:
             print(str(e))
             print("Retrieval of Schema information is unsuccessful!")
@@ -342,6 +398,9 @@ class Explain:
     def get_visual_plan(self, node: QEP_Node) -> List[str]:
         return QEP_Tree().get_visual_plan(node, [])
 
+    def checkRootIsEmpty(self):
+        return QEP_Tree().isEmpty()
+
     """
     Builds the QEP tree by first getting the plan from postgres
     Then builds the tree using the QEP_Tree class
@@ -349,7 +408,7 @@ class Explain:
     """
 
     def build_QEP_tree(self, query: str) -> QEP_Node:
-        plan = self.cursorManager.get_QEP("explain " + query)
+        plan = self.cursorManager.get_QEP(r"explain " + query)
         return QEP_Tree().build(plan)
 
     """
@@ -371,10 +430,39 @@ class Explain:
     def get_QEP_comparison(self, node1: QEP_Node, node2: QEP_Node) -> List[str]:
         return QEP_Tree().compareQEP(node1, node2)
 
-    def compare_sql(string1, string2):
+    def stripString(str):
+        # remove ; at the end
+        if str[-1] == ";":
+            str = str[:-1]
+
+        # Remove leading/trailing whitespace and split into lines
+        sql_lines = str.lower().strip().split("\n")
+        stripped_list = [s.strip() for s in sql_lines]
+
+        # print(stripped_list)
+        # Join lines back together with no separator
+        result = " ".join(stripped_list)
+
+        keywords = ["from", "where", "like", "group by", "order by"]
+        sections = []
+        start_index = 0
+        pre = ""
+
+        for keyword in keywords:
+            index = result.find(keyword)
+            if index != -1:
+                sections.append(pre + " " + result[start_index:index].strip())
+                # sections.append(keyword)
+                start_index = index + len(keyword)
+                pre = keyword
+
+        sections.append(pre + " " + result[start_index:].strip())
+        return sections
+
+    def compare_sql(self, string1, string2):
         # Split the strings into lines
-        lines1 = string1.splitlines()
-        lines2 = string2.splitlines()
+        lines1 = Explain.stripString(string1)
+        lines2 = Explain.stripString(string2)
 
         # Compare the lines using the Differ class
         differ = difflib.Differ()
@@ -393,15 +481,15 @@ class Explain:
                 differences.append(temp)
                 temp = []
             if len(temp) == 0 and line.startswith("-"):
-                temp.append(("SQL old removed\n", text))
+                temp.append(("### SQL old removed\n\n", text))
                 sign = "-"
             elif len(temp) == 0 and line.startswith("+"):
-                temp.append(("SQL new added\n", text))
+                temp.append(("### SQL new added\n\n", text))
                 sign = "+"
             elif line.startswith("+") and pre.startswith("+"):
-                temp.append(("       ", text))  # SQL 2
+                temp.append(("", text))  # SQL 2
             elif line.startswith("-") and pre.startswith("-"):
-                temp.append(("       ", text))  # SQL 1
+                temp.append(("", text))  # SQL 1
             elif line.startswith("?"):
                 continue
 
@@ -410,35 +498,48 @@ class Explain:
         if len(temp) != 0:
             differences.append(temp)
 
+        if differences[-1][0][0] == "### SQL old removed\n\n":
+            temp = []
+            temp.append(("### SQL new added\n\n", " "))
+            differences.append(temp)
+
         return differences
 
-    def explainSQL(diffArray):
+    def explainSQL(self, diffArray):
         line1 = ""
         line2 = ""
         pretype = ""
         change = []
-        explaination = []
+        explanation = []
 
         for i in diffArray:
             for diff_type, line in i:
-                if diff_type == "SQL new added\n" or diff_type == "SQL old removed\n":
+                if (
+                    diff_type == "### SQL new added\n\n"
+                    or diff_type == "### SQL old removed\n\n"
+                ):
                     pretype = diff_type
 
-                if pretype == "SQL old removed\n":
+                if pretype == "### SQL old removed\n\n":
                     if line1 and line2:
                         string1_words = re.split(r"[ _-]+", line1)
                         string2_words = re.split(r"[ _-]+", line2)
 
-                        for i in range(min(len(string1_words), len(string2_words))):
-                            if string1_words[i] != string2_words[i]:
-                                change.append([string1_words[i], string2_words[i]])
+                        if len(string1_words) == len(string2_words):
+                            for i in range(min(len(string1_words), len(string2_words))):
+                                if string1_words[i] != string2_words[i]:
+                                    change.append([string1_words[i], string2_words[i]])
+                        else:
+                            change.append(
+                                [" ".join(string1_words), " ".join(string2_words)]
+                            )
                         line1 = ""
                         line2 = ""
 
-                if line1 == "" or pretype == "SQL old removed\n":
+                if line1 == "" or pretype == "### SQL old removed\n\n":
                     line1 += line
                     continue
-                elif line2 == "" or pretype == "SQL new added\n":
+                elif line2 == "" or pretype == "### SQL new added\n\n":
                     line2 += line
                     continue
 
@@ -446,25 +547,30 @@ class Explain:
             string1_words = re.split(r"[ _-]+", line1)
             string2_words = re.split(r"[ _-]+", line2)
 
-            for i in range(min(len(string1_words), len(string2_words))):
-                if string1_words[i] != string2_words[i]:
-                    change.append([string1_words[i], string2_words[i]])
+            if len(string1_words) == len(string2_words):
+                for i in range(min(len(string1_words), len(string2_words))):
+                    if string1_words[i] != string2_words[i]:
+                        change.append([string1_words[i], string2_words[i]])
+            else:
+                change.append([" ".join(string1_words), " ".join(string2_words)])
 
         for i in change:
-            if i[0].isnumeric() and i[1].isnumeric():
-                explaination.append("There is a change in value")
+            if i[1] == " ":
+                explanation.append("The old query is removed")
+            elif i[0].isnumeric() and i[1].isnumeric():
+                explanation.append("There is a change in value")
             elif i[0].isnumeric() and (i[1].isalnum() or i[1].isalpha()):
-                explaination.append("There is a change from a value to a variable")
+                explanation.append("There is a change from a value to a variable")
             elif i[1].isnumeric() and (i[0].isalnum() or i[0].isalpha()):
-                explaination.append("There is a change from a variable to a value")
+                explanation.append("There is a change from a variable to a value")
             elif (i[0].isalnum() or i[0].isalpha()) and (
                 i[1].isalnum() or i[1].isalpha()
             ):
-                explaination.append("There is a change in variable")
+                explanation.append("There is a change in variable")
             else:
-                explaination.append("The query here has been changed")
+                explanation.append("The query here has been changed")
 
-        return explaination
+        return explanation
 
     def printSQLexplain(differences, explain):
         oldtype = ""
@@ -475,13 +581,45 @@ class Explain:
             for diff_type, line in i:
                 print(f"{diff_type} {line}")
 
-                if diff_type == "SQL old removed\n":
+                if diff_type == "### SQL old removed\n\n":
                     oldtype = diff_type
-                elif diff_type == "SQL new added\n":
+                elif diff_type == "### SQL new added\n\n":
                     newtype = diff_type
 
             if oldtype and newtype:
-                print("\nExplaination : " + explain[c] + "\n=========================")
+                print("\nExplanation : " + explain[c] + "\n=========================")
                 c += 1
                 oldtype = ""
                 newtype = ""
+
+    def concatDifferencesExplainSQL(self, differences, explain):
+        concatString = ""
+        oldtype = ""
+        newtype = ""
+        c = 0
+
+        if len(differences) == 0 and len(explain) == 0:
+            concatString = concatString + (
+                "There are no differences between the 2 SQL queries"
+            )
+
+        else:
+            for i in differences:
+                for diff_type, line in i:
+                    concatString = concatString + diff_type + line + "\n\n"
+                    # print(f"{diff_type} {line}")
+                    if diff_type == "### SQL old removed\n\n":
+                        oldtype = diff_type
+                    elif diff_type == "### SQL new added\n\n":
+                        newtype = diff_type
+
+                if oldtype and newtype:
+                    concatString = concatString + (
+                        "\n### Explanation :\n\n "
+                        + explain[c]
+                        + "\n===================\n"
+                    )
+                    c += 1
+                    oldtype = ""
+                    newtype = ""
+        return concatString
