@@ -130,7 +130,6 @@ class Ui_Form(object):
         self.stopOldButton.setText("Stop \U0001F507")
         self.stopOldButton.setEnabled(False)
         self.oldAudiohorizontalLayout.addWidget(self.stopOldButton)
-        # Form.addWidget(self.horizontalLayout)
 
         self.oldQEPLayout.addWidget(self.diffBetweenSQLOuput)
         self.oldQEPLayout.addLayout(self.oldAudiohorizontalLayout)
@@ -490,6 +489,7 @@ class Ui_Form(object):
         lay.addWidget(dialog.newGraphicsView)
         dialog.exec_()
 
+    # Displays schema in the application
     def setSchema(self):
         self.databaseSchema.reset()
         schema = self.explainObj.updateSchema()
@@ -503,7 +503,7 @@ class Ui_Form(object):
                 table_item.addChild(attr_item)
             self.databaseSchema.addTopLevelItem(table_item)
 
-
+    # Namings for the labels
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
         Form.setWindowTitle(_translate("Form", "Form"))
@@ -520,7 +520,6 @@ class Ui_Form(object):
 
     def onClickedOldQueryButton(self):
         self.oldQueryButton.clicked.connect(self.analyseOldQuery)
-        # self.oldQueryButton.clicked.connect(lambda: self.generateQEP("old",self.getOldQueryInput()))
 
     def generatingPopUp(self):
         msg = QMessageBox()
@@ -622,8 +621,6 @@ class Ui_Form(object):
             textToSpeechQEP = self.diffBetweenQEPOutput.toPlainText().replace("#", "")
             self.textToSpeech(textToSpeechQEP, "newQuery")
 
-            # print(self.getOldQueryInput())
-            # print(self.getNewQueryInput())
             
             if self.getOldQueryInput() == self.getNewQueryInput():
                 concatDiffSQL = "Both SQL query are the same."
@@ -634,12 +631,7 @@ class Ui_Form(object):
 
                 concatDiffSQL = self.explainObj.concatDifferencesExplainSQL(differences, explaination)
 
-            # concatDiffSQL = concatDiffSQL.replace("<","less than")
-            # concatDiffSQL = concatDiffSQL.replace("=", " equals")
-            # concatDiffSQL = concatDiffSQL.replace(">", "more than")
 
-
-            # print(concatDiffSQL)
             self.showDiffBetweenSQL(concatDiffSQL)
             textToSpeechSQL = self.diffBetweenSQLOuput.toPlainText().replace("#","")
             self.textToSpeech(textToSpeechSQL, "oldQuery")
